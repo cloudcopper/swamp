@@ -9,25 +9,32 @@ import (
 )
 
 func main() {
+	//
+	// Create loggger
+	//
 	log := slog.Default()
 	log.Info("starting")
 	defer log.Info("exiting")
 
+	//
+	// Load configuration
+	//
 	repoConfigs, err := LoadRepoConfigs(log, repoConfigsFileName)
 	if err != nil {
 		log.Error("unable to load repo config!!!", slog.Any("err", err), slog.String("repoConfigsFileName", repoConfigsFileName))
 		os.Exit(1)
 	}
-
 	repoConfigs = LoadRepoConfigsDefaults(log, repoConfigs)
 	log.Info(spew.Sdump(repoConfigs))
 
 	// TODO
 	// - create entity reacting to new seals
-	// - create filesystem watcher for seals/repos
 
+	//
+	// Create filesystem watcher for seals/repos
+	//
 	log.Info("create filesystem watcher")
-	watcher, err := newWatcher()
+	watcher, err := NewWatcher(log)
 	if err != nil {
 		log.Error("unable to create new watcher", slog.Any("err", err))
 		os.Exit(2)
@@ -37,7 +44,7 @@ func main() {
 	for k, v := range repoConfigs {
 		log := log.With(slog.String("config", k), slog.String("name", v.Name))
 		if strings.Contains(v.Name, specialRepoName) || strings.Contains(v.Input, specialRepoName) || strings.Contains(v.Storage, specialRepoName) {
-			log.Info("wildcard repos are not supported", slog.String("input", v.Input), slog.String("storage", v.Storage))
+			log.Warn("wildcard repos are not supported", slog.String("input", v.Input), slog.String("storage", v.Storage))
 			continue
 		}
 		assert(v.Name != "" && !strings.Contains(v.Name, specialRepoName)) // NOTE We are not supporting whildcard/dynamic repo creations atm
@@ -49,8 +56,10 @@ func main() {
 			continue
 		}
 		if !isDirectoryExist(v.Storage) {
-			log.Error("storage directory does not exists", slog.String("storage", v.Storage))
-			continue
+			if err := os.MkdirAll(v.Storage, os.ModePerm); err != nil { // TODO Shall it has more strick permission?
+				log.Error("storage directory can not be created", slog.String("storage", v.Storage), slog.Any("err", err))
+				continue
+			}
 		}
 	}
 	// - traversal all repos
