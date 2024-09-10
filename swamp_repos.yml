@@ -7,7 +7,6 @@ defaults:
   name:      ${REPO_NAME}
   input:     "{{with .SWAMP_INPUT}}{{.}}{{else}}/mnt/input{{end}}/${REPO_NAME}"
   meta:      "{{with .SWAMP_META}}{{.}}{{else}}export.txt{{end}}"
-  seal:      "{{with .SWAMP_SEAL}}{{.}}{{else}}*.sha256sum{{end}}"
   storage:   "{{with .SWAMP_STORAGE}}{{.}}{{else}}/mnt/artifacts{{end}}/${REPO_NAME}"
   retention: "{{with .SWAMP_RETENTION}}{{.}}{{else}}1h{{end}}"
   broken:    "{{with .SWAMP_BROKEN}}{{.}}{{else}}/dev/null{{end}}"

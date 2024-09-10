@@ -4,86 +4,98 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	testifyAssert "github.com/stretchr/testify/assert"
 )
 
-func TestWatcherBasic1(t *testing.T) {
+func TestWatcherServiceBasic1(t *testing.T) {
 	assert := testifyAssert.New(t)
 
-	// prepare test directory
-	dir := "testdata/tmp/TestWatcherBasic"
-	_ = os.RemoveAll(dir)
-	err := os.MkdirAll(dir, os.ModePerm)
+	// Prepare test directory
+	// NOTE The watcher service needs abs path, so operate with abs path from beginning
+	dir, err := filepath.Abs("testdata/tmp/TestWatcherServiceBasic1")
 	assert.NoError(err)
+	if err != nil {
+		t.FailNow()
+	}
+	_ = os.RemoveAll(dir) // ignore result as the test directory may not exists
+	err = os.MkdirAll(dir, os.ModePerm)
+	assert.NoError(err)
+	if err != nil {
+		t.FailNow()
+	}
 
-	// create watcher
+	// Create watcher service
 	log := slog.Default()
-	w, err := NewWatcher(log)
+	s, err := NewWatcherService(log, "TestWatcherServiceBasic1")
 	assert.NoError(err)
-	defer w.Close()
+	defer s.Close()
 
-	// add dir to watch
-	err = w.AddDir(dir)
+	// Add dir to watch
+	err = s.AddDir(dir)
 	assert.NoError(err)
+	if err != nil {
+		t.FailNow()
+	}
 
-	// create file1
+	// Create file1
 	file1 := path.Join(dir, "file1")
 	log.Info("create file", slog.String("file", file1))
 	err = createFile(file1, "file 1 line 1\n")
 	assert.NoError(err)
-	file := <-w.ChanModified
+	file := <-s.chanModified
 	assert.Equal(file, file1)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file1)
 
-	// create file2
+	// Create file2
 	file2 := path.Join(dir, "file2")
 	log.Info("create file", slog.String("file", file2))
 	err = createFile(file2, "file 2 line 1\n")
 	assert.NoError(err)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file2)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file2)
 
-	// modify file2
+	// Modify file2
 	log.Info("append to file", slog.String("file", file2))
 	err = appendFile(file2, "file 2 line 2\n")
 	assert.NoError(err)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file2)
 
-	// move file2 to file3
+	// Move file2 to file3
 	file3 := path.Join(dir, "file3")
 	log.Info("move file", slog.String("old", file2), slog.String("new", file3))
-	err = moveFile(file2, file3)
+	err = os.Rename(file2, file3)
 	assert.NoError(err)
-	file = <-w.ChanRemoved
+	file = <-s.chanRemoved
 	assert.Equal(file, file2)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file3)
 
-	// modify file3
+	// Modify file3
 	log.Info("append to file", slog.String("file", file3))
 	err = appendFile(file3, "file 3 line 3\n")
 	assert.NoError(err)
-	file = <-w.ChanModified
+	file = <-s.chanModified
 	assert.Equal(file, file3)
 
-	// delete file3
+	// Delete file3
 	log.Info("delete file", slog.String("file", file3))
-	err = deleteFile(file3)
+	err = os.Remove(file3)
 	assert.NoError(err)
-	file = <-w.ChanRemoved
+	file = <-s.chanRemoved
 	assert.Equal(file, file3)
 
-	// delete file1
+	// Delete file1
 	log.Info("delete file", slog.String("file", file1))
-	err = deleteFile(file1)
+	err = os.Remove(file1)
 	assert.NoError(err)
-	file = <-w.ChanRemoved
+	file = <-s.chanRemoved
 	assert.Equal(file, file1)
 }
 
@@ -104,10 +116,4 @@ func appendFile(name string, content string) error {
 	defer f.Close()
 	_, err = f.WriteString(content)
 	return err
-}
-func deleteFile(name string) error {
-	return os.Remove(name)
-}
-func moveFile(old, new string) error {
-	return os.Rename(old, new)
 }

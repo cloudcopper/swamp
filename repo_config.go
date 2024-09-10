@@ -15,12 +15,11 @@ import (
 type RepoConfigs map[string]RepoConfig
 
 type RepoConfig struct {
-	Defaults  string
-	Name      string
-	Input     string
+	Defaults  string `xorm:"-"`
+	Name      string `xorm:"pk unique"`
+	Input     string `xorm:"unique"`
 	Meta      string
-	Seal      string
-	Storage   string
+	Storage   string `xorm:"unique"`
 	Retention *time.Duration
 	Broken    string
 }
@@ -106,9 +105,6 @@ func LoadRepoConfigsDefaults(log *Logger, config RepoConfigs) RepoConfigs {
 
 		if v.Meta == "" {
 			v.Meta = def.Meta
-		}
-		if v.Seal == "" {
-			v.Seal = def.Seal
 		}
 
 		if v.Storage == "" {
