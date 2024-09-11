@@ -1,6 +1,9 @@
 package main
 
-import "os"
+import (
+	"errors"
+	"os"
+)
 
 func isDirectoryExist(name string) bool {
 	s, err := os.Stat(name)
@@ -12,6 +15,14 @@ func isDirectoryExist(name string) bool {
 	}
 
 	return true
+}
+
+// NoSuchFile return true is file name does not exists
+func NoSuchFile(name string) bool {
+	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	return false
 }
 
 // The fileSize returns size of file or zero

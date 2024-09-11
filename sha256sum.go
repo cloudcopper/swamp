@@ -56,6 +56,11 @@ func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error)
 			continue
 		}
 		checksum, fileName := a[0], a[1]
+		if !isSecureFileName(fileName) {
+			err = ErrUnsecureFileName
+			badFiles = append(badFiles, fileName)
+			return goodFiles, badFiles, err
+		}
 		fileName = path.Join(dir, fileName)
 		fileName, err = filepath.Abs(fileName)
 		if err != nil {

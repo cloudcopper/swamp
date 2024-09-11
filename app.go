@@ -101,22 +101,32 @@ func app(log *Logger) {
 	session.Close()
 
 	//
-	// Create filesystem watcher for checksum files
+	// Create artifacts storage
+	//
+	artifactsStorage, err := NewBasicArtifactsStorage(log, engine)
+	if err != nil {
+		log.Error("unable to create artifacts storage", slog.Any("err", err))
+		os.Exit(6)
+	}
+	defer artifactsStorage.Close()
+
+	//
+	// Create filesystem watcher for input files
 	//
 	inputWatcher, err := NewWatcherService(log, "input")
 	if err != nil {
 		log.Error("unable to create new watcher service", slog.Any("err", err))
-		os.Exit(6)
+		os.Exit(7)
 	}
 	defer inputWatcher.Close()
 
 	//
 	// Create service reacting to new checksum files
 	//
-	checksumService, err := NewChecksumService(log, inputWatcher, engine)
+	checksumService, err := NewChecksumService(log, engine, inputWatcher, artifactsStorage)
 	if err != nil {
 		log.Error("unable to create checksum service", slog.Any("err", err))
-		os.Exit(7)
+		os.Exit(8)
 	}
 	defer checksumService.Close()
 
@@ -132,7 +142,7 @@ func app(log *Logger) {
 	})
 	if err != nil {
 		log.Error("failure during adding dir to input watcher", slog.Any("err", err))
-		os.Exit(8)
+		os.Exit(9)
 	}
 
 	go func() { // DEBUG this is debug purpose only function

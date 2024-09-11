@@ -2,19 +2,23 @@ package main
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"xorm.io/xorm"
 )
 
 type ChecksumService struct {
-	log     *Logger
-	watcher InputWatcherService
-	engine  *xorm.Engine
-	closeWg sync.WaitGroup
+	log              *Logger
+	engine           *xorm.Engine
+	watcher          InputWatcherService
+	artifactsStorage ArtifactsStorage
+	closeWg          sync.WaitGroup
 }
 
-func NewChecksumService(log *Logger, watcher InputWatcherService, engine *xorm.Engine) (*ChecksumService, error) {
+func NewChecksumService(log *Logger, engine *xorm.Engine, watcher InputWatcherService, artifactsStorage ArtifactsStorage) (*ChecksumService, error) {
 	log = log.With(slog.String("entity", "ChecksumService"))
 
 	if _, err := FindAll[Repo](engine); err != nil {
@@ -22,9 +26,10 @@ func NewChecksumService(log *Logger, watcher InputWatcherService, engine *xorm.E
 	}
 
 	s := &ChecksumService{
-		log:     log,
-		watcher: watcher,
-		engine:  engine,
+		log:              log,
+		engine:           engine,
+		watcher:          watcher,
+		artifactsStorage: artifactsStorage,
 	}
 	log.Info("created")
 
@@ -54,9 +59,11 @@ func (s *ChecksumService) Close() {
 
 func (s *ChecksumService) background() {
 	log := s.log
+	engine := s.engine
 	modified := s.watcher.GetChanModified()
+	artifactsStorage := s.artifactsStorage
 
-	repos, err := FindAll[Repo](s.engine)
+	repos, err := FindAll[Repo](engine)
 	if err != nil {
 		log.Error("unable to read all repos", slog.Any("err", err))
 		return
@@ -85,7 +92,56 @@ func (s *ChecksumService) background() {
 			}
 			log.Info("checksum file verified", slog.Any("goodFiles", goodFiles))
 
-			// TODO Move artifact to storage
+			// Create new artifacts
+			artifacts := append(goodFiles, path)
+			id := getFirstSubdir(repo.Input, path)
+			artifactId, err := artifactsStorage.NewArtifacts(repo, artifacts, ArtifactID(id))
+			if err != nil {
+				log.Error("unable to create new artifacts", slog.Any("err", err))
+			}
+			log.Info("new artifact created", slog.String("artifactId", string(artifactId)))
+
+			// Optionally cleanup input artifacts
+			log.Info("cleanup input artifacts")
+			input := repo.Input
+			for i := range artifacts {
+				// clean up in reverse order, so the checksum file is removed first
+				file := artifacts[len(artifacts)-i-1]
+				assert(strings.HasPrefix(file, input))
+				dir := getFirstSubdir(input, file)
+				name := filepath.Join(input, dir)
+				if dir == "" {
+					assert(filepath.IsAbs(file))
+					name = file
+				} else {
+					if !isDirectoryExist(name) {
+						continue
+					}
+				}
+				if err := os.RemoveAll(name); err != nil {
+					log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
+				}
+			}
+
+			break
 		}
 	}
+}
+
+// The gitFirstSubdir returns first directory name after input
+// Example:
+// input is '/mnt/input/project'
+// if path is '/mnt/input/project/1234.crc' then return is ”
+// if path is '/mnt/input/project/rel-4.2.2/1234.crc' then return is 'rel-4.2.2'
+func getFirstSubdir(input, path string) string {
+	assert(strings.HasPrefix(path, input))
+	a := strings.Split(strings.TrimLeft(strings.TrimPrefix(path, input), string(os.PathSeparator)), string(os.PathSeparator))
+	assert(len(a) >= 1)
+	assert(a[0] != "")
+	dir := a[0]
+	if len(a) <= 1 {
+		dir = ""
+	}
+
+	return dir
 }
