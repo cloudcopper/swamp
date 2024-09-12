@@ -1,16 +1,19 @@
-package main
+package swamp
 
 import (
 	"log/slog"
 	"path/filepath"
 	"sync"
 
+	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 	"github.com/fsnotify/fsnotify"
 )
 
 type WatcherService struct {
 	id           string
-	log          *Logger
+	log          *ports.Logger
 	watcher      *fsnotify.Watcher
 	chanModified chan string
 	chanRemoved  chan string
@@ -29,7 +32,7 @@ func (s *WatcherService) GetChanRemoved() chan string {
 	return s.chanRemoved
 }
 
-func NewWatcherService(log *Logger, id string) (*WatcherService, error) {
+func NewWatcherService(log *ports.Logger, id string) (*WatcherService, error) {
 	log = log.With(slog.String("entity", "WatcherService"), slog.String("id", id))
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -80,7 +83,7 @@ func (s *WatcherService) AddDir(path string) error {
 	log := s.log
 	if abspath, err := filepath.Abs(path); abspath != path || err != nil {
 		log.Error("add dir failed!!!", slog.Any("err", err), slog.String("path", path), slog.String("abspath", abspath))
-		return ErrMustBeAbsPath
+		return errors.ErrMustBeAbsPath
 	}
 	log.Info("add dir", slog.String("path", path))
 	err := s.watcher.Add(path)
@@ -108,7 +111,7 @@ func (s *WatcherService) background() {
 			}
 
 			file := event.Name
-			if event.Has(fsnotify.Create) && isDirectoryExist(file) {
+			if event.Has(fsnotify.Create) && lib.IsDirectoryExist(file) {
 				dir := file
 				log := log.With(slog.String("dir", dir))
 				log.Debug("directory created")
@@ -119,12 +122,12 @@ func (s *WatcherService) background() {
 				continue
 			}
 			if event.Has(fsnotify.Create) {
-				size := fileSize(file)
+				size := lib.FileSize(file)
 				log.Debug("file created", slog.String("file", file), slog.Int64("size", size))
 				s.chanModified <- file
 			}
 			if event.Has(fsnotify.Write) {
-				size := fileSize(file)
+				size := lib.FileSize(file)
 				log.Debug("file modified", slog.String("file", file), slog.Int64("size", size))
 				s.chanModified <- file
 			}

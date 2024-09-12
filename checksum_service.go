@@ -1,4 +1,4 @@
-package main
+package swamp
 
 import (
 	"log/slog"
@@ -7,21 +7,26 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cloudcopper/swamp/adapters"
+	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 	"xorm.io/xorm"
 )
 
 type ChecksumService struct {
-	log              *Logger
+	log              *ports.Logger
 	engine           *xorm.Engine
 	watcher          InputWatcherService
-	artifactsStorage ArtifactsStorage
+	artifactsStorage ports.ArtifactsStorage
 	closeWg          sync.WaitGroup
 }
 
-func NewChecksumService(log *Logger, engine *xorm.Engine, watcher InputWatcherService, artifactsStorage ArtifactsStorage) (*ChecksumService, error) {
+func NewChecksumService(log *ports.Logger, engine *xorm.Engine, watcher InputWatcherService, artifactsStorage ports.ArtifactsStorage) (*ChecksumService, error) {
 	log = log.With(slog.String("entity", "ChecksumService"))
 
-	if _, err := FindAll[Repo](engine); err != nil {
+	if _, err := FindAll[domain.Repo](engine); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +68,7 @@ func (s *ChecksumService) background() {
 	modified := s.watcher.GetChanModified()
 	artifactsStorage := s.artifactsStorage
 
-	repos, err := FindAll[Repo](engine)
+	repos, err := FindAll[domain.Repo](engine)
 	if err != nil {
 		log.Error("unable to read all repos", slog.Any("err", err))
 		return
@@ -75,15 +80,15 @@ func (s *ChecksumService) background() {
 
 		for _, repo := range repos {
 			// Check the path belongs to repo
-			if !repo.IsPathInInput(path) {
+			if !strings.HasPrefix(path, repo.Input) {
 				continue
 			}
 			log := log.With(slog.String("repo", repo.Name))
 			log.Debug("path match repo")
 
 			// Check the path is a good checksum
-			goodFiles, badFiles, err := CheckChecksum(log, path)
-			if err == ErrIsNotChecksumFile {
+			goodFiles, badFiles, err := adapters.CheckChecksum(log, path)
+			if err == errors.ErrIsNotChecksumFile {
 				continue
 			}
 			if err != nil {
@@ -95,26 +100,26 @@ func (s *ChecksumService) background() {
 			// Create new artifacts
 			artifacts := append(goodFiles, path)
 			id := getFirstSubdir(repo.Input, path)
-			artifactId, err := artifactsStorage.NewArtifacts(repo, artifacts, ArtifactID(id))
+			artifactId, err := artifactsStorage.NewArtifacts(repo, artifacts, domain.ArtifactID(id))
 			if err != nil {
 				log.Error("unable to create new artifacts", slog.Any("err", err))
 			}
 			log.Info("new artifact created", slog.String("artifactId", string(artifactId)))
 
-			// Optionally cleanup input artifacts
+			// Cleanup input artifacts
 			log.Info("cleanup input artifacts")
 			input := repo.Input
 			for i := range artifacts {
 				// clean up in reverse order, so the checksum file is removed first
 				file := artifacts[len(artifacts)-i-1]
-				assert(strings.HasPrefix(file, input))
+				lib.Assert(strings.HasPrefix(file, input))
 				dir := getFirstSubdir(input, file)
 				name := filepath.Join(input, dir)
 				if dir == "" {
-					assert(filepath.IsAbs(file))
+					lib.Assert(filepath.IsAbs(file))
 					name = file
 				} else {
-					if !isDirectoryExist(name) {
+					if !lib.IsDirectoryExist(name) {
 						continue
 					}
 				}
@@ -122,6 +127,10 @@ func (s *ChecksumService) background() {
 					log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
 				}
 			}
+
+			//
+			// TODO Now we have to update add artifact record
+			//
 
 			break
 		}
@@ -134,10 +143,10 @@ func (s *ChecksumService) background() {
 // if path is '/mnt/input/project/1234.crc' then return is ”
 // if path is '/mnt/input/project/rel-4.2.2/1234.crc' then return is 'rel-4.2.2'
 func getFirstSubdir(input, path string) string {
-	assert(strings.HasPrefix(path, input))
+	lib.Assert(strings.HasPrefix(path, input))
 	a := strings.Split(strings.TrimLeft(strings.TrimPrefix(path, input), string(os.PathSeparator)), string(os.PathSeparator))
-	assert(len(a) >= 1)
-	assert(a[0] != "")
+	lib.Assert(len(a) >= 1)
+	lib.Assert(a[0] != "")
 	dir := a[0]
 	if len(a) <= 1 {
 		dir = ""

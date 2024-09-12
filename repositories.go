@@ -1,6 +1,10 @@
-package main
+package swamp
 
-import "xorm.io/xorm"
+import (
+	"fmt"
+
+	"xorm.io/xorm"
+)
 
 func FindAll[T any](engine *xorm.Engine) ([]*T, error) {
 	var v []*T
@@ -9,7 +13,7 @@ func FindAll[T any](engine *xorm.Engine) ([]*T, error) {
 }
 
 func Iterate[T any](engine *xorm.Engine, callback func(repo *T) (bool, error)) error {
-	errBreak := Error("break - not an error")
+	errBreak := fmt.Errorf("break - not an error")
 	err := engine.Iterate(new(T), func(_ int, bean interface{}) error {
 		rec := bean.(*T)
 		ok, err := callback(rec)

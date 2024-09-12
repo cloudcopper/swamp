@@ -1,4 +1,4 @@
-package main
+package swamp
 
 import (
 	"log/slog"
@@ -11,10 +11,14 @@ import (
 	_ "modernc.org/sqlite" // purego sqlite3 driver
 	"xorm.io/xorm"
 
+	"github.com/cloudcopper/swamp/adapters"
+	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 	"github.com/davecgh/go-spew/spew"
 )
 
-func app(log *Logger) {
+func App(log *ports.Logger) {
 	//
 	// Load configuration
 	//
@@ -41,7 +45,7 @@ func app(log *Logger) {
 	//
 	// Sync database
 	//
-	if err := engine.Sync(new(Repo)); err != nil {
+	if err := engine.Sync(new(domain.Repo)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
 		os.Exit(4)
 	}
@@ -49,7 +53,7 @@ func app(log *Logger) {
 	//
 	// Create repos
 	// TODO By hexarch that shall be in separate function in main.go using services (as accessing db and domain)
-	// TODO Some of asserts shall be part of Validate()
+	// TODO Some of lib.Asserts shall be part of Validate()
 	//
 	session := engine.NewSession()
 	session.Begin()
@@ -59,16 +63,16 @@ func app(log *Logger) {
 			log.Warn("wildcard repos are not supported", slog.String("input", v.Input), slog.String("storage", v.Storage))
 			continue
 		}
-		assert(v.Name != "" && !strings.Contains(v.Name, specialRepoName)) // NOTE We are not supporting wildcard/dynamic repo creations atm
-		assert(v.Input != "")                                              // NOTE We are not supporting read-only repo atm
-		assert(v.Storage != "")                                            // at least storage must be define
+		lib.Assert(v.Name != "" && !strings.Contains(v.Name, specialRepoName)) // NOTE We are not supporting wildcard/dynamic repo creations atm
+		lib.Assert(v.Input != "")                                              // NOTE We are not supporting read-only repo atm
+		lib.Assert(v.Storage != "")                                            // at least storage must be define
 
 		// Check directory as is (potentially relative)
-		if !isDirectoryExist(v.Input) {
+		if !lib.IsDirectoryExist(v.Input) {
 			log.Error("input directory does not exists", slog.String("input", v.Input))
 			continue
 		}
-		if !isDirectoryExist(v.Storage) {
+		if !lib.IsDirectoryExist(v.Storage) {
 			if err := os.MkdirAll(v.Storage, os.ModePerm); err != nil { // TODO Shall it has more strick permission?
 				log.Error("storage directory can not be created", slog.Any("err", err), slog.String("storage", v.Storage))
 				continue
@@ -87,7 +91,7 @@ func app(log *Logger) {
 		}
 
 		// Add repo
-		repo, err := NewRepo(v)
+		repo, err := domain.NewRepo(v.Repo)
 		if err != nil {
 			log.Error("unable create repo object", slog.Any("err", err))
 			continue
@@ -103,7 +107,7 @@ func app(log *Logger) {
 	//
 	// Create artifacts storage
 	//
-	artifactsStorage, err := NewBasicArtifactsStorage(log, engine)
+	artifactsStorage, err := adapters.NewBasicArtifactsStorageAdapter(log, engine)
 	if err != nil {
 		log.Error("unable to create artifacts storage", slog.Any("err", err))
 		os.Exit(6)
@@ -133,7 +137,7 @@ func app(log *Logger) {
 	// TODO Traversal all repos and "bind" "services". Order is undecided atm
 	// TODO We could rescan added dir during AddDir to generate events to binded
 	// TODO service for processing artifacts stored prior
-	err = Iterate(engine, func(repo *Repo) (bool, error) {
+	err = Iterate(engine, func(repo *domain.Repo) (bool, error) {
 		err := inputWatcher.AddDir(repo.Input)
 		if err != nil {
 			log.Error("unable add dir to input watcher", slog.Any("err", err), slog.String("input", repo.Input))

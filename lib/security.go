@@ -1,8 +1,8 @@
-package main
+package lib
 
 import "strings"
 
-func isSecureFileName(name string) bool {
+func IsSecureFileName(name string) bool {
 	if strings.Contains(name, "..") || strings.Contains(name, ":") {
 		return false
 	}

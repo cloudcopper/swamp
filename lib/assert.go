@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"log"
@@ -7,7 +7,7 @@ import (
 // The params may be:
 // - error
 // - bool, string
-func assert(params ...interface{}) {
+func Assert(params ...interface{}) {
 	cond := params[0]
 	if cond == nil {
 		return

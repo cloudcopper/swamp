@@ -1,4 +1,4 @@
-package main
+package swamp
 
 import (
 	"log/slog"

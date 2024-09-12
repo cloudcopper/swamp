@@ -1,4 +1,4 @@
-package main
+package adapters
 
 import (
 	"bufio"
@@ -9,6 +9,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/lib"
 )
 
 type Sha256 struct {
@@ -27,7 +30,7 @@ func (s *Sha256) Sum(fileName string) ([]byte, error) {
 		return nil, err
 	}
 
-	// hex.EncodeToString(
+	// Use hex.EncodeToString to convert to string
 	return hash.Sum(nil), nil
 }
 
@@ -56,8 +59,8 @@ func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error)
 			continue
 		}
 		checksum, fileName := a[0], a[1]
-		if !isSecureFileName(fileName) {
-			err = ErrUnsecureFileName
+		if !lib.IsSecureFileName(fileName) {
+			err = errors.ErrUnsecureFileName
 			badFiles = append(badFiles, fileName)
 			return goodFiles, badFiles, err
 		}
@@ -88,5 +91,5 @@ func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error)
 }
 
 func init() {
-	CreateChecksumAlgo(100000, "*.sha256sum", &Sha256{})
+	RegisterChecksumAlgo(100000, "*.sha256sum", &Sha256{})
 }

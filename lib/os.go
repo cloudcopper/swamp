@@ -1,11 +1,11 @@
-package main
+package lib
 
 import (
 	"errors"
 	"os"
 )
 
-func isDirectoryExist(name string) bool {
+func IsDirectoryExist(name string) bool {
 	s, err := os.Stat(name)
 	if err != nil {
 		return false
@@ -26,11 +26,21 @@ func NoSuchFile(name string) bool {
 }
 
 // The fileSize returns size of file or zero
-func fileSize(name string) int64 {
+func FileSize(name string) int64 {
 	fi, err := os.Stat(name)
 	if err != nil {
 		return 0
 
 	}
 	return fi.Size()
+}
+
+func CreateFile(name string, content string) error {
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(content)
+	return err
 }

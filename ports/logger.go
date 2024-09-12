@@ -1,4 +1,4 @@
-package main
+package ports
 
 import "log/slog"
 

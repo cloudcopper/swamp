@@ -1,13 +1,15 @@
-package main
+package swamp
 
 import (
 	"embed"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	tpl "github.com/cloudcopper/misc/env/template"
+	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,20 +17,15 @@ import (
 type RepoConfigs map[string]RepoConfig
 
 type RepoConfig struct {
-	Defaults  string `xorm:"-"`
-	Name      string `xorm:"pk unique"`
-	Input     string `xorm:"unique"`
-	Meta      string
-	Storage   string `xorm:"unique"`
-	Retention *time.Duration
-	Broken    string
+	domain.Repo `yaml:",inline"`
+	Defaults    string
 }
 
 const defaultsNodeName = "defaults"
 const specialRepoName = "${REPO_NAME}"
 const defaultRepoConfigsFileName = "swamp_repos.yml"
 
-var repoConfigsFileName = getEnvDefault("SWAMP_REPO_CONFIG", defaultRepoConfigsFileName)
+var repoConfigsFileName = lib.GetEnvDefault("SWAMP_REPO_CONFIG", defaultRepoConfigsFileName)
 
 //go:embed *.yml
 var fs embed.FS
@@ -37,7 +34,7 @@ var fs embed.FS
 // optionally fallback to embedded filesystem,
 // execute file as env template,
 // and unmarshal result to the config
-func LoadRepoConfigs(log *Logger, fileName string) (RepoConfigs, error) {
+func LoadRepoConfigs(log *ports.Logger, fileName string) (RepoConfigs, error) {
 	log.Info("loading repo config", slog.String("fileName", fileName))
 	// try load from real filesystem
 	blob, err := os.ReadFile(fileName)
@@ -67,7 +64,7 @@ func LoadRepoConfigs(log *Logger, fileName string) (RepoConfigs, error) {
 	return cfg, err
 }
 
-func LoadRepoConfigsDefaults(log *Logger, config RepoConfigs) RepoConfigs {
+func LoadRepoConfigsDefaults(log *ports.Logger, config RepoConfigs) RepoConfigs {
 	ret := RepoConfigs{}
 
 	for k, v := range config {

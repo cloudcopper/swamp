@@ -1,4 +1,4 @@
-package main
+package adapters
 
 import (
 	"encoding/hex"
@@ -6,21 +6,17 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 )
 
-type ChecksumAlgo interface {
-	// Shall return checksum of given file or error
-	Sum(fileName string) ([]byte, error)
-	// CheckFiles return list of good files, list of bad files as specified by checksumFileName
-	// or first error. Files must be returned with abs path
-	CheckFiles(checksumFileName string) ([]string, []string, error)
-}
-
-func CreateChecksumAlgo(prio int, pattern string, algo ChecksumAlgo) {
+func RegisterChecksumAlgo(prio int, pattern string, algo ports.ChecksumAlgo) {
 	info := ChecksumAlgoInfo{prio, pattern, algo}
 	checksumAlgos = append(checksumAlgos, info)
 	sort.Slice(checksumAlgos, func(i, j int) bool {
-		assert(checksumAlgos[i].prio != checksumAlgos[j].prio)
+		lib.Assert(checksumAlgos[i].prio != checksumAlgos[j].prio)
 		return checksumAlgos[i].prio < checksumAlgos[j].prio
 	})
 }
@@ -28,13 +24,13 @@ func CreateChecksumAlgo(prio int, pattern string, algo ChecksumAlgo) {
 type ChecksumAlgoInfo struct {
 	prio    int
 	pattern string
-	algo    ChecksumAlgo
+	algo    ports.ChecksumAlgo
 }
 
 var checksumAlgos = []ChecksumAlgoInfo{}
 
-func CheckChecksum(log *Logger, checksumFileName string) ([]string, []string, error) {
-	assert(filepath.IsAbs(checksumFileName))
+func CheckChecksum(log *ports.Logger, checksumFileName string) ([]string, []string, error) {
+	lib.Assert(filepath.IsAbs(checksumFileName))
 
 	fileName := filepath.Base(checksumFileName)
 	for _, it := range checksumAlgos {
@@ -65,12 +61,12 @@ func CheckChecksum(log *Logger, checksumFileName string) ([]string, []string, er
 			log.Error("unable check content", slog.Any("goodFiles", goodFiles), slog.Any("badFiles", badFiles), slog.Any("err", err))
 		case len(badFiles) != 0:
 			log.Error("content is partially broken", slog.Any("goodFiles", goodFiles), slog.Any("badFiles", badFiles))
-			err = ErrChecksumFileHasBrokenFiles
+			err = errors.ErrChecksumFileHasBrokenFiles
 		default:
 			log.Debug("content is fine", slog.Any("goodFiles", goodFiles))
 		}
 		return goodFiles, badFiles, err
 	}
 
-	return nil, nil, ErrIsNotChecksumFile
+	return nil, nil, errors.ErrIsNotChecksumFile
 }

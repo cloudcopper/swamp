@@ -1,4 +1,4 @@
-package main
+package swamp
 
 import (
 	"log/slog"
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cloudcopper/swamp/lib"
 	testifyAssert "github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +44,7 @@ func TestWatcherServiceBasic1(t *testing.T) {
 	// Create file1
 	file1 := path.Join(dir, "file1")
 	log.Info("create file", slog.String("file", file1))
-	err = createFile(file1, "file 1 line 1\n")
+	err = lib.CreateFile(file1, "file 1 line 1\n")
 	assert.NoError(err)
 	file := <-s.chanModified
 	assert.Equal(file, file1)
@@ -53,7 +54,7 @@ func TestWatcherServiceBasic1(t *testing.T) {
 	// Create file2
 	file2 := path.Join(dir, "file2")
 	log.Info("create file", slog.String("file", file2))
-	err = createFile(file2, "file 2 line 1\n")
+	err = lib.CreateFile(file2, "file 2 line 1\n")
 	assert.NoError(err)
 	file = <-s.chanModified
 	assert.Equal(file, file2)
@@ -99,15 +100,6 @@ func TestWatcherServiceBasic1(t *testing.T) {
 	assert.Equal(file, file1)
 }
 
-func createFile(name string, content string) error {
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE, 0660)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(content)
-	return err
-}
 func appendFile(name string, content string) error {
 	f, err := os.OpenFile(name, os.O_APPEND|os.O_WRONLY, 0660)
 	if err != nil {

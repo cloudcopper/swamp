@@ -1,4 +1,4 @@
-package main
+package errors
 
 import "fmt"
 
@@ -12,15 +12,15 @@ const ErrIsNotChecksumFile = Error("is not checksum file")
 const ErrUnsecureFileName = Error("unsecure file name")
 
 type ErrNoSuchDirectory struct {
-	path string
+	Path string
 }
 
-func (e ErrNoSuchDirectory) Error() string { return fmt.Sprintf("no such directory %v", e.path) }
+func (e ErrNoSuchDirectory) Error() string { return fmt.Sprintf("no such directory %v", e.Path) }
 
 type ErrArtifactAlreadyExists struct {
-	dest string
+	Path string
 }
 
 func (e ErrArtifactAlreadyExists) Error() string {
-	return fmt.Sprintf("artifact already exists %v", e.dest)
+	return fmt.Sprintf("artifact already exists %v", e.Path)
 }
