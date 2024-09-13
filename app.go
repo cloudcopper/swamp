@@ -10,9 +10,11 @@ import (
 
 	_ "modernc.org/sqlite" // purego sqlite3 driver
 	"xorm.io/xorm"
+	"xorm.io/xorm/names"
 
 	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/davecgh/go-spew/spew"
@@ -45,7 +47,8 @@ func App(log *ports.Logger) {
 	//
 	// Sync database
 	//
-	if err := engine.Sync(new(domain.Repo)); err != nil {
+	engine.SetMapper(names.GonicMapper{})
+	if err := engine.Sync2(new(domain.Repo), new(domain.Artifact)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
 		os.Exit(4)
 	}
@@ -163,12 +166,39 @@ func App(log *ports.Logger) {
 	//      dynamic repos already created before)
 
 	//
+	// Create router
+	//
+	router := adapters.NewRouter()
+
+	//
+	// Add routes
+	//
+
+	// Create http server
+	// The router must has all routes already
+	// It will start server in separate goroutine
+	addr := ":8080"
+	httpServer, err := infra.NewWebServer(log, addr, router)
+	if err != nil {
+		log.Error("unable create web server", slog.Any("err", err), slog.String("addr", addr))
+		os.Exit(1)
+	}
+
+	//
 	// Add ctrl-c shutdown
 	//
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	log.Info("press ctrl-c to exit")
 	<-c
+
+	// Close http server
+	httpServer.Close()
 	// Close watcher by ctrl-c
 	inputWatcher.Close()
+
+	// Post DEBUG
+	// Dump all db to test file
+	err = engine.DumpAllToFile("./swamp_db.txt")
+	log.Error("dump all to file", slog.Any("err", err))
 }

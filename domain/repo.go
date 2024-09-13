@@ -11,6 +11,7 @@ type Repo struct {
 	Storage   string `xorm:"unique"`
 	Retention *time.Duration
 	Broken    string
+	CreatedAt time.Time   `xorm:"created" yaml:"-"`
 	Artifacts []*Artifact `xorm:"-" yaml:"-"`
 }
 

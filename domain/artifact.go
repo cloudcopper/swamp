@@ -6,6 +6,6 @@ type ArtifactID string
 
 type Artifact struct {
 	ID        ArtifactID `xorm:"pk unique"`
-	RepoName  string     `xorm:"index"`
-	CreatedAt time.Time  `xorm:"created"`
+	RepoName  string     `xorm:"index notnull"`
+	CreatedAt time.Time
 }

@@ -99,8 +99,8 @@ func (s *ChecksumService) background() {
 
 			// Create new artifacts
 			artifacts := append(goodFiles, path)
-			id := getFirstSubdir(repo.Input, path)
-			artifactId, err := artifactsStorage.NewArtifacts(repo, artifacts, domain.ArtifactID(id))
+			id := lib.GetFirstSubdir(repo.Input, path)
+			artifactId, createdAt, err := artifactsStorage.NewArtifacts(repo, artifacts, domain.ArtifactID(id))
 			if err != nil {
 				log.Error("unable to create new artifacts", slog.Any("err", err))
 			}
@@ -113,7 +113,7 @@ func (s *ChecksumService) background() {
 				// clean up in reverse order, so the checksum file is removed first
 				file := artifacts[len(artifacts)-i-1]
 				lib.Assert(strings.HasPrefix(file, input))
-				dir := getFirstSubdir(input, file)
+				dir := lib.GetFirstSubdir(input, file)
 				name := filepath.Join(input, dir)
 				if dir == "" {
 					lib.Assert(filepath.IsAbs(file))
@@ -128,29 +128,17 @@ func (s *ChecksumService) background() {
 				}
 			}
 
-			//
-			// TODO Now we have to update add artifact record
-			//
+			// Insert artifact record
+			artifact := &domain.Artifact{
+				ID:        artifactId,
+				RepoName:  repo.Name,
+				CreatedAt: createdAt,
+			}
+			if _, err := engine.Insert(artifact); err != nil {
+				log.Error("unable insert artifact record", slog.String("artifactId", string(artifactId)), slog.Any("err", err))
+			}
 
 			break
 		}
 	}
-}
-
-// The gitFirstSubdir returns first directory name after input
-// Example:
-// input is '/mnt/input/project'
-// if path is '/mnt/input/project/1234.crc' then return is ”
-// if path is '/mnt/input/project/rel-4.2.2/1234.crc' then return is 'rel-4.2.2'
-func getFirstSubdir(input, path string) string {
-	lib.Assert(strings.HasPrefix(path, input))
-	a := strings.Split(strings.TrimLeft(strings.TrimPrefix(path, input), string(os.PathSeparator)), string(os.PathSeparator))
-	lib.Assert(len(a) >= 1)
-	lib.Assert(a[0] != "")
-	dir := a[0]
-	if len(a) <= 1 {
-		dir = ""
-	}
-
-	return dir
 }

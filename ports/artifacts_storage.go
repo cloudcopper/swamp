@@ -1,7 +1,11 @@
 package ports
 
-import "github.com/cloudcopper/swamp/domain"
+import (
+	"time"
+
+	"github.com/cloudcopper/swamp/domain"
+)
 
 type ArtifactsStorage interface {
-	NewArtifacts(*domain.Repo, []string, domain.ArtifactID) (domain.ArtifactID, error)
+	NewArtifacts(*domain.Repo, []string, domain.ArtifactID) (domain.ArtifactID, time.Time, error)
 }

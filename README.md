@@ -5,11 +5,11 @@ Swamp - trivial artifactory
 
 TODO
 ====
-- Add record with new artifact (check with some dump)
 - read web - go-chi?
 - quick view to database
+- rescan artifacts at startup ?
 - nicer ui
-- meta ???
+- meta ??? remove Repo.Meta field and use similar to the checksum algo way
 - Use OptWithLogger to pass log into New... ?
 - adapter/slog_logger.go + correct cmd/main.go
 - How to be with checksum algos?

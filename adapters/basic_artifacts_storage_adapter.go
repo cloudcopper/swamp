@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ func NewBasicArtifactsStorageAdapter(log *ports.Logger, engine *xorm.Engine) (*B
 	return s, nil
 }
 
-func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts []string, id domain.ArtifactID) (domain.ArtifactID, error) {
+func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts []string, id domain.ArtifactID) (domain.ArtifactID, time.Time, error) {
 	lib.Assert(repo != nil)
 	lib.Assert(len(artifacts) >= 1)
 	log := s.log
@@ -43,15 +44,15 @@ func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts
 	log.Info("add artifacts", slog.String("storage", storage), slog.Any("files", artifacts))
 
 	if !lib.IsDirectoryExist(storage) {
-		return "", errors.ErrNoSuchDirectory{Path: storage}
+		return "", time.Time{}, errors.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
 	if lib.IsDirectoryExist(dest) {
-		return "", errors.ErrArtifactAlreadyExists{Path: dest}
+		return "", time.Time{}, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
 	if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-		return "", err
+		return "", time.Time{}, err
 	}
 
 	input := repo.Input
@@ -67,11 +68,11 @@ func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
 			if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-				return "", err
+				return "", time.Time{}, err
 			}
 		}
 		if err := os.Rename(fileName, filepath.Join(dest, file)); err != nil {
-			return "", err
+			return "", time.Time{}, err
 		}
 	}
 
@@ -85,21 +86,20 @@ func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts
 		log.Warn("unable to create", slog.String("file", file), slog.Any("err", err))
 	}
 
-	/*
-		a, err := os.ReadFile(file)
-		if err != nil {
-			log.Warn("unable to read", slog.String("file", file), slog.Any("err", err))
-		}
-		now, err = strconv.ParseInt(string(a), 10, 64)
-		if err != nil {
-			log.Warn("unable convert creation time", slog.Any("err", err))
-		}
+	// Read back creation time
+	a, err := os.ReadFile(file)
+	if err != nil {
+		log.Warn("unable to read", slog.String("file", file), slog.Any("err", err))
+	}
+	// Once external creation time might be created with tailing \n or even more
+	// parse only leading digits and ignore rest
+	t, err := strconv.ParseInt(lib.LeadingDigits(string(a)), 10, 64)
+	if err != nil {
+		log.Warn("unable convert creation time", slog.Any("err", err))
+	}
+	createdAt := time.Unix(t, 0)
 
-		// TODO Now we have to update database
-		_ = now
-	*/
-
-	return id, nil
+	return id, createdAt, nil
 }
 
 func (s *BasicArtifactsStorageAdapter) Close() {
