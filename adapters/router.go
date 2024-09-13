@@ -4,12 +4,17 @@ import (
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	slogchi "github.com/samber/slog-chi"
 )
 
-func NewRouter() ports.Router {
-	router := chi.NewRouter()
-	router.Use(middleware.Logger) // TODO Replace with slog-chi
-	router.Use(middleware.Recoverer)
+func NewRouter(log *ports.Logger) ports.Router {
+	r := chi.NewRouter()
 
-	return router
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(slogchi.New(log))
+	r.Use(middleware.Recoverer)
+	// r.Use(middleware.Timeout(10 * time.Second))
+
+	return r
 }

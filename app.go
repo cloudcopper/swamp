@@ -1,7 +1,9 @@
 package swamp
 
 import (
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -168,11 +170,14 @@ func App(log *ports.Logger) {
 	//
 	// Create router
 	//
-	router := adapters.NewRouter()
+	router := adapters.NewRouter(log)
 
 	//
 	// Add routes
 	//
+	router.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, world!")
+	})
 
 	// Create http server
 	// The router must has all routes already

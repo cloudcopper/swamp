@@ -8,6 +8,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.1-0.20240516151259-c1467c02fba5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/samber/slog-chi v1.11.1
 	github.com/stretchr/testify v1.9.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.33.0
@@ -28,6 +29,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	go.opentelemetry.io/otel v1.19.0 // indirect
+	go.opentelemetry.io/otel/trace v1.19.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

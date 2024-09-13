@@ -5,7 +5,6 @@ Swamp - trivial artifactory
 
 TODO
 ====
-- read web - go-chi?
 - quick view to database
 - rescan artifacts at startup ?
 - nicer ui
