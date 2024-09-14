@@ -1,15 +1,18 @@
 package errors
 
-import "fmt"
+import (
+	"fmt"
 
-type Error string
+	"github.com/cloudcopper/swamp/lib"
+)
 
-func (e Error) Error() string { return string(e) }
+// TODO Review this file and probably split errors to domain/app specific
+//      and implementation/infra specific
 
-const ErrMustBeAbsPath = Error("must be absolute path")
-const ErrChecksumFileHasBrokenFiles = Error("checksum file has broken file(s)")
-const ErrIsNotChecksumFile = Error("is not checksum file")
-const ErrUnsecureFileName = Error("unsecure file name")
+const ErrMustBeAbsPath = lib.Error("must be absolute path")
+const ErrChecksumFileHasBrokenFiles = lib.Error("checksum file has broken file(s)")
+const ErrIsNotChecksumFile = lib.Error("is not checksum file")
+const ErrUnsecureFileName = lib.Error("unsecure file name")
 
 type ErrNoSuchDirectory struct {
 	Path string

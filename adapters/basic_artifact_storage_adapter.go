@@ -9,22 +9,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/oklog/ulid/v2"
 	"xorm.io/xorm"
 )
 
-type BasicArtifactsStorageAdapter struct {
+type BasicArtifactStorageAdapter struct {
 	log    *ports.Logger
 	engine *xorm.Engine
 }
 
-func NewBasicArtifactsStorageAdapter(log *ports.Logger, engine *xorm.Engine) (*BasicArtifactsStorageAdapter, error) {
-	log = log.With(slog.String("entity", "BasicArtifactsStorageAdapter"))
-	s := &BasicArtifactsStorageAdapter{
+func NewBasicArtifactStorageAdapter(log *ports.Logger, engine *xorm.Engine) (*BasicArtifactStorageAdapter, error) {
+	log = log.With(slog.String("entity", "BasicArtifactStorageAdapter"))
+	s := &BasicArtifactStorageAdapter{
 		log:    log,
 		engine: engine,
 	}
@@ -32,13 +32,13 @@ func NewBasicArtifactsStorageAdapter(log *ports.Logger, engine *xorm.Engine) (*B
 	return s, nil
 }
 
-func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts []string, id domain.ArtifactID) (domain.ArtifactID, time.Time, error) {
+func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, artifacts []string, id models.ArtifactID) (models.ArtifactID, time.Time, error) {
 	lib.Assert(repo != nil)
 	lib.Assert(len(artifacts) >= 1)
 	log := s.log
 	storage := repo.Storage
 	if id == "" {
-		id = domain.ArtifactID(ulid.Make().String())
+		id = models.ArtifactID(ulid.Make().String())
 	}
 	log = log.With(slog.String("repo", repo.Name), slog.String("id", string(id)))
 	log.Info("add artifacts", slog.String("storage", storage), slog.Any("files", artifacts))
@@ -102,7 +102,7 @@ func (s *BasicArtifactsStorageAdapter) NewArtifacts(repo *domain.Repo, artifacts
 	return id, createdAt, nil
 }
 
-func (s *BasicArtifactsStorageAdapter) Close() {
+func (s *BasicArtifactStorageAdapter) Close() {
 	log := s.log
 	log.Info("closing")
 }

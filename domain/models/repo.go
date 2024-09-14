@@ -1,4 +1,4 @@
-package domain
+package models
 
 import (
 	"time"
@@ -15,6 +15,7 @@ type Repo struct {
 	Artifacts []*Artifact `xorm:"-" yaml:"-"`
 }
 
+// TODO Check if this can be done nicer so we are not passing Repo from RepoConfig
 func NewRepo(repo Repo) (*Repo, error) {
 	r := &Repo{}
 	*r = repo

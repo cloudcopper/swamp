@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	tpl "github.com/cloudcopper/misc/env/template"
-	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 
@@ -17,7 +17,7 @@ import (
 type RepoConfigs map[string]RepoConfig
 
 type RepoConfig struct {
-	domain.Repo `yaml:",inline"`
+	models.Repo `yaml:",inline"`
 	Defaults    string
 }
 

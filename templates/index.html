@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+    {{range .Errors}}
+    <div class="error">
+        <span>{{.}}</span>
+    </div>
+    {{end}}
+
+    {{range .Repos}}
+    <div class="repo">
+        <span>{{.Name}}</span>
+    </div>
+    {{end}}
+
+    {{range .Artifacts}}
+    <div class="artifact">
+        <span>{{.ID}}</span>
+        <span>{{.RepoName}}</span>
+        <span>{{.CreatedAt}}</span>
+    </div>
+    {{end}}
+</body>
+</html>

@@ -10,31 +10,31 @@ import (
 	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
+	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
-	"xorm.io/xorm"
 )
 
 type ChecksumService struct {
-	log              *ports.Logger
-	engine           *xorm.Engine
-	watcher          InputWatcherService
-	artifactsStorage ports.ArtifactsStorage
-	closeWg          sync.WaitGroup
+	log             *ports.Logger
+	watcher         InputWatcherService
+	artifactStorage ports.ArtifactStorage
+	repositories    domain.Repositories
+	closeWg         sync.WaitGroup
 }
 
-func NewChecksumService(log *ports.Logger, engine *xorm.Engine, watcher InputWatcherService, artifactsStorage ports.ArtifactsStorage) (*ChecksumService, error) {
+func NewChecksumService(log *ports.Logger, watcher InputWatcherService, artifactStorage ports.ArtifactStorage, repositories domain.Repositories) (*ChecksumService, error) {
 	log = log.With(slog.String("entity", "ChecksumService"))
 
-	if _, err := FindAll[domain.Repo](engine); err != nil {
+	if _, err := repositories.Repo().FindAll(); err != nil {
 		return nil, err
 	}
 
 	s := &ChecksumService{
-		log:              log,
-		engine:           engine,
-		watcher:          watcher,
-		artifactsStorage: artifactsStorage,
+		log:             log,
+		watcher:         watcher,
+		artifactStorage: artifactStorage,
+		repositories:    repositories,
 	}
 	log.Info("created")
 
@@ -64,11 +64,10 @@ func (s *ChecksumService) Close() {
 
 func (s *ChecksumService) background() {
 	log := s.log
-	engine := s.engine
 	modified := s.watcher.GetChanModified()
-	artifactsStorage := s.artifactsStorage
+	artifactStorage := s.artifactStorage
 
-	repos, err := FindAll[domain.Repo](engine)
+	repos, err := s.repositories.Repo().FindAll()
 	if err != nil {
 		log.Error("unable to read all repos", slog.Any("err", err))
 		return
@@ -100,7 +99,7 @@ func (s *ChecksumService) background() {
 			// Create new artifacts
 			artifacts := append(goodFiles, path)
 			id := lib.GetFirstSubdir(repo.Input, path)
-			artifactId, createdAt, err := artifactsStorage.NewArtifacts(repo, artifacts, domain.ArtifactID(id))
+			artifactId, createdAt, err := artifactStorage.NewArtifact(repo, artifacts, models.ArtifactID(id))
 			if err != nil {
 				log.Error("unable to create new artifacts", slog.Any("err", err))
 			}
@@ -129,12 +128,12 @@ func (s *ChecksumService) background() {
 			}
 
 			// Insert artifact record
-			artifact := &domain.Artifact{
+			artifact := &models.Artifact{
 				ID:        artifactId,
 				RepoName:  repo.Name,
 				CreatedAt: createdAt,
 			}
-			if _, err := engine.Insert(artifact); err != nil {
+			if err := s.repositories.Artifact().Insert(artifact); err != nil {
 				log.Error("unable insert artifact record", slog.String("artifactId", string(artifactId)), slog.Any("err", err))
 			}
 
