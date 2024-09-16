@@ -22,14 +22,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-func App(log *ports.Logger) {
+func App(log *ports.Logger) int {
 	//
 	// Load configuration
 	//
 	repoConfigs, err := LoadRepoConfigs(log, repoConfigsFileName)
 	if err != nil {
 		log.Error("unable to load repo config!!!", slog.Any("err", err), slog.String("repoConfigsFileName", repoConfigsFileName))
-		os.Exit(10)
+		return 10
 	}
 	repoConfigs = LoadRepoConfigsDefaults(log, repoConfigs)
 	log.Info(spew.Sdump(repoConfigs))
@@ -42,7 +42,7 @@ func App(log *ports.Logger) {
 	engine, err := xorm.NewEngine(driver, source) // using modernc.org/sqlite
 	if err != nil {
 		log.Error("unable connect to database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
-		os.Exit(11)
+		return 11
 	}
 	defer engine.Close()
 	//
@@ -51,7 +51,7 @@ func App(log *ports.Logger) {
 	engine.SetMapper(names.GonicMapper{})
 	if err := engine.Sync2(new(models.Repo), new(models.Artifact)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
-		os.Exit(12)
+		return 12
 	}
 	//
 	// Create repositories
@@ -59,12 +59,12 @@ func App(log *ports.Logger) {
 	repoRepository, err := repository.NewRepoRepository(engine)
 	if err != nil {
 		log.Error("unable create repo repository", slog.Any("err", err))
-		os.Exit(13)
+		return 13
 	}
 	artifactRepository, err := repository.NewArtifactRepository(engine)
 	if err != nil {
 		log.Error("unable create artifact repository", slog.Any("err", err))
-		os.Exit(14)
+		return 14
 	}
 	repositories := repository.NewRepositories(repoRepository, artifactRepository)
 
@@ -116,7 +116,7 @@ func App(log *ports.Logger) {
 		}
 		if _, err := session.Insert(repo); err != nil {
 			log.Error("unable insert repo record", slog.Any("err", err))
-			os.Exit(15)
+			return 15
 		}
 	}
 	session.Commit()
@@ -128,7 +128,7 @@ func App(log *ports.Logger) {
 	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, engine)
 	if err != nil {
 		log.Error("unable to create artifact storage", slog.Any("err", err))
-		os.Exit(16)
+		return 16
 	}
 	defer artifactStorage.Close()
 
@@ -138,7 +138,7 @@ func App(log *ports.Logger) {
 	inputWatcher, err := NewWatcherService(log, "input")
 	if err != nil {
 		log.Error("unable to create new watcher service", slog.Any("err", err))
-		os.Exit(17)
+		return 17
 	}
 	defer inputWatcher.Close()
 
@@ -148,7 +148,7 @@ func App(log *ports.Logger) {
 	checksumService, err := NewChecksumService(log, inputWatcher, artifactStorage, repositories)
 	if err != nil {
 		log.Error("unable to create checksum service", slog.Any("err", err))
-		os.Exit(18)
+		return 18
 	}
 	defer checksumService.Close()
 
@@ -164,7 +164,7 @@ func App(log *ports.Logger) {
 	})
 	if err != nil {
 		log.Error("failure during adding dir to input watcher", slog.Any("err", err))
-		os.Exit(19)
+		return 19
 	}
 
 	go func() { // DEBUG this is debug purpose only function
@@ -183,9 +183,14 @@ func App(log *ports.Logger) {
 	//
 	router := adapters.NewRouter(log)
 	//
+	// Create render object
+	// It will load templates
+	//
+	render := infra.NewRender()
+	//
 	// Create controllers
 	//
-	frontPageController := controllers.NewFrontPageController(log, repoRepository, artifactRepository)
+	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, repoRepository)
 	artifactController := controllers.NewArtifactController(log, artifactRepository)
 	//
@@ -209,7 +214,7 @@ func App(log *ports.Logger) {
 	httpServer, err := infra.NewWebServer(log, addr, router)
 	if err != nil {
 		log.Error("unable create web server", slog.Any("err", err), slog.String("addr", addr))
-		os.Exit(20)
+		return 20
 	}
 
 	//
@@ -229,4 +234,6 @@ func App(log *ports.Logger) {
 	dumpFile := "./swamp_db.txt"
 	err = engine.DumpAllToFile(dumpFile)
 	log.Error("dump whole db to file", slog.String("dumpFile", dumpFile), slog.Any("err", err))
+
+	return 0
 }

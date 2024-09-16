@@ -10,6 +10,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/samber/slog-chi v1.11.1
 	github.com/stretchr/testify v1.9.0
+	github.com/unrolled/render v1.6.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.33.0
 	xorm.io/xorm v1.3.9

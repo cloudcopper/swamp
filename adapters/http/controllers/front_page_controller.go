@@ -3,52 +3,49 @@ package controllers
 import (
 	"log/slog"
 	"net/http"
-	"text/template"
 
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/ports"
 )
 
 type FrontPageController struct {
-	log                *ports.Logger
-	repoRepository     domain.RepoRepository
-	artifactRepository domain.ArtifactRepository
+	log    *ports.Logger
+	render infra.Render
+	repos  domain.Repositories
 }
 
-func NewFrontPageController(log *ports.Logger,
-	repoRepository domain.RepoRepository,
-	artifactRepository domain.ArtifactRepository) *FrontPageController {
+func NewFrontPageController(log *ports.Logger, render infra.Render, repos domain.Repositories) *FrontPageController {
 	log = log.With(slog.String("entity", "FrontPageController"))
-	s := &FrontPageController{
-		log:                log,
-		repoRepository:     repoRepository,
-		artifactRepository: artifactRepository,
+	c := &FrontPageController{
+		log:    log,
+		render: render,
+		repos:  repos,
 	}
-	return s
+	return c
 }
 
-func (s *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
+func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 	errors := []string{}
-	repos, err := s.repoRepository.FindAll()
+	repos, err := c.repos.Repo().FindAll()
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
-	artifacts, err := s.artifactRepository.FindAll()
+	artifacts, err := c.repos.Artifact().FindAll()
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
 
 	data := struct {
+		Errors    []string
 		Repos     []*models.Repo
 		Artifacts []*models.Artifact
-		Errors    []string
 	}{
+		Errors:    errors,
 		Repos:     repos,
 		Artifacts: artifacts,
-		Errors:    errors,
 	}
 
-	tmpl := template.Must(template.ParseFiles("templates/index.html"))
-	tmpl.Execute(w, data)
+	c.render.HTML(w, http.StatusOK, "index", data)
 }
