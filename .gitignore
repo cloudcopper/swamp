@@ -1,5 +1,6 @@
 .*
 !.gitignore
 testdata/tmp
-swamp
+/swamp
+/cmd/swamp/swamp
 vendor/
