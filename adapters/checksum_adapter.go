@@ -29,8 +29,32 @@ type ChecksumAlgoInfo struct {
 
 var checksumAlgos = []ChecksumAlgoInfo{}
 
-func CheckChecksum(log *ports.Logger, checksumFileName string) ([]string, []string, error) {
-	lib.Assert(filepath.IsAbs(checksumFileName))
+// IsChecksumFile returns true if path match any
+// patterns supported by registered algorithms.
+// The path must be absolute.
+func IsChecksumFile(path string) bool {
+	lib.Assert(lib.IsAbs(path))
+	fileName := filepath.Base(path)
+
+	for _, it := range checksumAlgos {
+		ok, err := filepath.Match(it.pattern, fileName)
+		if err != nil {
+			continue
+		}
+		if ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// CheckChecksum checks the checksumFileName
+// and all files listed inside the checksumFileName.
+// It returns the checksum of the checksumFileName,
+// good files, broken files and error
+func CheckChecksum(log ports.Logger, checksumFileName string) (string, []string, []string, error) {
+	lib.Assert(lib.IsAbs(checksumFileName))
 
 	fileName := filepath.Base(checksumFileName)
 	for _, it := range checksumAlgos {
@@ -65,8 +89,8 @@ func CheckChecksum(log *ports.Logger, checksumFileName string) ([]string, []stri
 		default:
 			log.Debug("content is fine", slog.Any("goodFiles", goodFiles))
 		}
-		return goodFiles, badFiles, err
+		return hex.EncodeToString(checksum[:]), goodFiles, badFiles, err
 	}
 
-	return nil, nil, errors.ErrIsNotChecksumFile
+	return "", nil, nil, errors.ErrIsNotChecksumFile
 }

@@ -7,7 +7,7 @@ import (
 	slogchi "github.com/samber/slog-chi"
 )
 
-func NewRouter(log *ports.Logger) ports.Router {
+func NewRouter(log ports.Logger) ports.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)

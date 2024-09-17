@@ -2,6 +2,7 @@ package lib
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,4 +22,16 @@ func GetFirstSubdir(root, path string) string {
 	}
 
 	return dir
+}
+
+// IsAbs covers problem of  filepath.IsAbs which only checks
+// first element of path and allows .. inside.
+// The filepath.Abs meanwhile does filepath.Clean.
+// So this function returns true, if filepath.Abs returns very same value
+func IsAbs(path string) bool {
+	if abs, err := filepath.Abs(path); err != nil || abs != path {
+		return false
+	}
+
+	return true
 }

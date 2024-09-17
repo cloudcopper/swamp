@@ -1,6 +1,7 @@
-package swamp
+package infra
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path"
@@ -30,12 +31,17 @@ func TestWatcherServiceBasic1(t *testing.T) {
 
 	// Create watcher service
 	log := slog.Default()
-	s, err := NewWatcherService(log, "TestWatcherServiceBasic1")
+	bus := NewEventBus()
+	defer bus.Shutdown()
+	s, err := NewWatcherService("TestWatcherServiceBasic1", log, bus)
 	assert.NoError(err)
 	defer s.Close()
 
+	chanModified := bus.Sub(fmt.Sprintf("%v-file-modified", s.id))
+	chanRemoved := bus.Sub(fmt.Sprintf("%v-file-removed", s.id))
+
 	// Add dir to watch
-	err = s.AddDir(dir)
+	err = s.addDir(dir)
 	assert.NoError(err)
 	if err != nil {
 		t.FailNow()
@@ -46,58 +52,58 @@ func TestWatcherServiceBasic1(t *testing.T) {
 	log.Info("create file", slog.String("file", file1))
 	err = lib.CreateFile(file1, "file 1 line 1\n")
 	assert.NoError(err)
-	file := <-s.chanModified
-	assert.Equal(file, file1)
-	file = <-s.chanModified
-	assert.Equal(file, file1)
+	file := <-chanModified
+	assert.Equal(file[0], file1)
+	file = <-chanModified
+	assert.Equal(file[0], file1)
 
 	// Create file2
 	file2 := path.Join(dir, "file2")
 	log.Info("create file", slog.String("file", file2))
 	err = lib.CreateFile(file2, "file 2 line 1\n")
 	assert.NoError(err)
-	file = <-s.chanModified
-	assert.Equal(file, file2)
-	file = <-s.chanModified
-	assert.Equal(file, file2)
+	file = <-chanModified
+	assert.Equal(file[0], file2)
+	file = <-chanModified
+	assert.Equal(file[0], file2)
 
 	// Modify file2
 	log.Info("append to file", slog.String("file", file2))
 	err = appendFile(file2, "file 2 line 2\n")
 	assert.NoError(err)
-	file = <-s.chanModified
-	assert.Equal(file, file2)
+	file = <-chanModified
+	assert.Equal(file[0], file2)
 
 	// Move file2 to file3
 	file3 := path.Join(dir, "file3")
 	log.Info("move file", slog.String("old", file2), slog.String("new", file3))
 	err = os.Rename(file2, file3)
 	assert.NoError(err)
-	file = <-s.chanRemoved
-	assert.Equal(file, file2)
-	file = <-s.chanModified
-	assert.Equal(file, file3)
+	file = <-chanRemoved
+	assert.Equal(file[0], file2)
+	file = <-chanModified
+	assert.Equal(file[0], file3)
 
 	// Modify file3
 	log.Info("append to file", slog.String("file", file3))
 	err = appendFile(file3, "file 3 line 3\n")
 	assert.NoError(err)
-	file = <-s.chanModified
-	assert.Equal(file, file3)
+	file = <-chanModified
+	assert.Equal(file[0], file3)
 
 	// Delete file3
 	log.Info("delete file", slog.String("file", file3))
 	err = os.Remove(file3)
 	assert.NoError(err)
-	file = <-s.chanRemoved
-	assert.Equal(file, file3)
+	file = <-chanRemoved
+	assert.Equal(file[0], file3)
 
 	// Delete file1
 	log.Info("delete file", slog.String("file", file1))
 	err = os.Remove(file1)
 	assert.NoError(err)
-	file = <-s.chanRemoved
-	assert.Equal(file, file1)
+	file = <-chanRemoved
+	assert.Equal(file[0], file1)
 }
 
 func appendFile(name string, content string) error {

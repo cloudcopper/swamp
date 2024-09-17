@@ -5,6 +5,12 @@ import (
 	"os"
 
 	"github.com/cloudcopper/swamp"
+	"github.com/cloudcopper/swamp/lib"
+)
+
+const (
+	retNoErrorCode      = 0
+	retGenericErrorCode = 1
 )
 
 func main() {
@@ -13,7 +19,19 @@ func main() {
 	//
 	log := slog.Default()
 	log.Info("starting")
-	defer log.Info("exiting")
-	code := swamp.App(log)
+
+	err := swamp.App(log)
+
+	code := retNoErrorCode
+	if err != nil {
+		code = retGenericErrorCode
+		if i, ok := err.(lib.ErrorCode); ok {
+			code = i.Code()
+		}
+		log.Error("exit", slog.Int("code", code), slog.Any("err", err))
+	} else {
+		log.Info("exit")
+	}
+
 	os.Exit(code)
 }

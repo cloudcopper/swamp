@@ -1,6 +1,10 @@
 package lib
 
-import "unicode"
+import (
+	"regexp"
+	"strings"
+	"unicode"
+)
 
 func LeadingDigits(s string) string {
 	for i, r := range s {
@@ -9,4 +13,16 @@ func LeadingDigits(s string) string {
 		}
 	}
 	return s
+}
+
+var reValidID = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9-_.]*$")
+
+func IsValidID(s string) bool {
+	if !reValidID.MatchString(s) {
+		return false
+	}
+	if strings.Contains(s, "..") {
+		return false
+	}
+	return true
 }

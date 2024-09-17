@@ -1,30 +1,51 @@
 package repository
 
 import (
-	"fmt"
-
-	"xorm.io/xorm"
+	"github.com/cloudcopper/swamp/ports"
 )
 
-func findAll[T any](engine *xorm.Engine) ([]*T, error) {
-	var v []*T
-	err := engine.Find(&v)
-	return v, err
+// The iterateAll iterates until callback return false or error
+func iterateAll[T any](db ports.DB, callback func(repo *T) (bool, error)) error {
+	rows, err := db.Model(new(T)).Rows()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var model T
+		if err := db.ScanRows(rows, &model); err != nil {
+			return err
+		}
+
+		ok, err := callback(&model)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			break
+		}
+	}
+
+	return nil
 }
 
-// The iterateAll iterates until callback return false or error
-func iterateAll[T any](engine *xorm.Engine, callback func(repo *T) (bool, error)) error {
-	errBreak := fmt.Errorf("break - not an error")
-	err := engine.Iterate(new(T), func(_ int, bean interface{}) error {
-		rec := bean.(*T)
-		ok, err := callback(rec)
-		if !ok {
-			return errBreak
+/*
+
+	for rows.Next() {
+		var repo models.Repo
+		if err := r.db.ScanRows(rows, &repo); err != nil {
+			return err
 		}
-		return err
-	})
-	if err == errBreak {
-		return nil
+
+		ok, err := callback(&repo)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			break
+		}
 	}
-	return err
-}
+
+	return nil
+*/

@@ -14,45 +14,44 @@ import (
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/oklog/ulid/v2"
-	"xorm.io/xorm"
 )
 
 type BasicArtifactStorageAdapter struct {
-	log    *ports.Logger
-	engine *xorm.Engine
+	log ports.Logger
+	db  ports.DB
 }
 
-func NewBasicArtifactStorageAdapter(log *ports.Logger, engine *xorm.Engine) (*BasicArtifactStorageAdapter, error) {
+func NewBasicArtifactStorageAdapter(log ports.Logger, db ports.DB) (*BasicArtifactStorageAdapter, error) {
 	log = log.With(slog.String("entity", "BasicArtifactStorageAdapter"))
 	s := &BasicArtifactStorageAdapter{
-		log:    log,
-		engine: engine,
+		log: log,
+		db:  db,
 	}
 
 	return s, nil
 }
 
-func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, artifacts []string, id models.ArtifactID) (models.ArtifactID, time.Time, error) {
+func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.ArtifactID, artifacts []string) (models.ArtifactID, int64, error) {
 	lib.Assert(repo != nil)
 	lib.Assert(len(artifacts) >= 1)
 	log := s.log
 	storage := repo.Storage
 	if id == "" {
-		id = models.ArtifactID(ulid.Make().String())
+		id = ulid.Make().String()
 	}
-	log = log.With(slog.String("repo", repo.Name), slog.String("id", string(id)))
+	log = log.With(slog.Any("repoID", repo.ID), slog.String("artifactID", string(id)))
 	log.Info("add artifacts", slog.String("storage", storage), slog.Any("files", artifacts))
 
 	if !lib.IsDirectoryExist(storage) {
-		return "", time.Time{}, errors.ErrNoSuchDirectory{Path: storage}
+		return "", 0, lib.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
 	if lib.IsDirectoryExist(dest) {
-		return "", time.Time{}, errors.ErrArtifactAlreadyExists{Path: dest}
+		return "", 0, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
 	if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-		return "", time.Time{}, err
+		return "", 0, err
 	}
 
 	input := repo.Input
@@ -63,16 +62,16 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, artifacts [
 		name := fileName
 		name = strings.TrimPrefix(name, input)
 		name = strings.TrimPrefix(name, string(os.PathSeparator))
-		name = strings.TrimPrefix(name, string(id)+string(os.PathSeparator))
+		name = strings.TrimPrefix(name, id+string(os.PathSeparator))
 		dir, file := filepath.Split(name)
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
 			if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-				return "", time.Time{}, err
+				return "", 0, err
 			}
 		}
 		if err := os.Rename(fileName, filepath.Join(dest, file)); err != nil {
-			return "", time.Time{}, err
+			return "", 0, err
 		}
 	}
 
@@ -80,7 +79,7 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, artifacts [
 	// It can be part of artifacts as well.
 	// In such case the creation time would be preserved by checksum file.
 	// Can be created by ```date +%s > _createdAt.txt```
-	now := time.Now().Unix()
+	now := time.Now().UTC().Unix()
 	file := filepath.Join(dest, "_createdAt.txt")
 	if err := lib.CreateFile(file, fmt.Sprintf("%v", now)); lib.NoSuchFile(file) && err != nil {
 		log.Warn("unable to create", slog.String("file", file), slog.Any("err", err))
@@ -97,7 +96,7 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, artifacts [
 	if err != nil {
 		log.Warn("unable convert creation time", slog.Any("err", err))
 	}
-	createdAt := time.Unix(t, 0)
+	createdAt := t
 
 	return id, createdAt, nil
 }

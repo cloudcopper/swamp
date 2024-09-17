@@ -11,12 +11,12 @@ import (
 )
 
 type WebServer struct {
-	log     *ports.Logger
+	log     ports.Logger
 	srv     *http.Server
 	closeWg sync.WaitGroup
 }
 
-func NewWebServer(log *ports.Logger, addr string, handler http.Handler) (*WebServer, error) {
+func NewWebServer(log ports.Logger, addr string, handler http.Handler) (*WebServer, error) {
 	log = log.With(slog.String("entity", "WebServer"))
 
 	l, err := net.Listen("tcp", addr)

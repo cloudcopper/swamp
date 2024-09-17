@@ -1,17 +1,27 @@
 # file:swamp_repos.yml
 
 #
+# The keys started from _ are ignored
 #
-#
-defaults:
-  name:      ${REPO_NAME}
-  input:     "{{with .SWAMP_INPUT}}{{.}}{{else}}/mnt/input{{end}}/${REPO_NAME}"
-  meta:      "{{with .SWAMP_META}}{{.}}{{else}}export.txt{{end}}"
-  storage:   "{{with .SWAMP_STORAGE}}{{.}}{{else}}/mnt/artifacts{{end}}/${REPO_NAME}"
-  retention: "{{with .SWAMP_RETENTION}}{{.}}{{else}}1h{{end}}"
-  broken:    "{{with .SWAMP_BROKEN}}{{.}}{{else}}/dev/null{{end}}"
+_defaults: &defaults
+  name:        "${REPO_ID}"
+  description: "${REPO_ID}"
+  input:       "{{with .SWAMP_INPUT}}{{.}}{{else}}/mnt/input{{end}}/${REPO_ID}"
+  storage:     "{{with .SWAMP_STORAGE}}{{.}}{{else}}/mnt/artifacts{{end}}/${REPO_ID}"
+  retention:   "{{with .SWAMP_RETENTION}}{{.}}{{else}}1h{{end}}"
+  broken:      "{{with .SWAMP_BROKEN}}{{.}}{{else}}/dev/null{{end}}"
+
+_week: &week
+  retention: "336h" # one week
 
 pimpim:
-  name:    "My Magic PimPim"
-  input:   {{with .HOME}}{{.}}{{end}}/tmp/pimpim/input
-  storage: {{with .HOME}}{{.}}{{end}}/tmp/pimpim/storage
+  <<: *defaults
+  description: "Magic PimPim test releases"
+  input:       {{with .HOME}}{{.}}{{end}}/tmp/${REPO_ID}/input
+  storage:     {{with .HOME}}{{.}}{{end}}/tmp/${REPO_ID}/storage
+
+bambam:
+  <<: [*defaults, *week]
+  description: "Magic BamBam official releases"
+  input:       {{with .HOME}}{{.}}{{end}}/tmp/bambam/input
+  storage:     {{with .HOME}}{{.}}{{end}}/tmp/bambam/storage

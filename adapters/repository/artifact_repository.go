@@ -1,32 +1,51 @@
 package repository
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/cloudcopper/swamp/domain/models"
-	"xorm.io/xorm"
+	"github.com/cloudcopper/swamp/ports"
 )
 
 type ArtifactRepository struct {
-	engine *xorm.Engine
+	db ports.DB
 }
 
-func NewArtifactRepository(engine *xorm.Engine) (*ArtifactRepository, error) {
+func NewArtifactRepository(db ports.DB) (*ArtifactRepository, error) {
 	r := &ArtifactRepository{
-		engine: engine,
+		db: db,
 	}
 	_, err := r.FindAll()
 	return r, err
 }
 
-func (r *ArtifactRepository) FindAll() ([]*models.Artifact, error) {
-	v, err := findAll[models.Artifact](r.engine)
-	return v, err
-}
-
 func (r *ArtifactRepository) IterateAll(callback func(repo *models.Artifact) (bool, error)) error {
-	return iterateAll[models.Artifact](r.engine, callback)
+	db := r.db.Order("created_at DESC")
+	return iterateAll[models.Artifact](db, callback)
 }
 
-func (r *ArtifactRepository) Insert(model *models.Artifact) error {
-	_, err := r.engine.Insert(model)
+func (r *ArtifactRepository) FindAll() ([]*models.Artifact, error) {
+	var artifacts []*models.Artifact
+	db := r.db.Order("created_at DESC")
+	err := db.Find(&artifacts).Error
+	return artifacts, err
+}
+
+func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.ArtifactID) (*models.Artifact, error) {
+	var artifact *models.Artifact
+	db := r.db
+	err := db.Find(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
+	return artifact, err
+}
+
+func (r *ArtifactRepository) Create(model *models.Artifact) error {
+	if model.CreatedAt == 0 {
+		model.CreatedAt = time.Now().UTC().Unix()
+	}
+	if err := model.Validate(); err != nil {
+		return fmt.Errorf("invalid repo object: %w", err)
+	}
+	err := r.db.Create(model).Error
 	return err
 }

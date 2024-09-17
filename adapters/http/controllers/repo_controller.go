@@ -1,38 +1,66 @@
 package controllers
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/go-chi/chi/v5"
 )
 
 type RepoController struct {
-	log            *ports.Logger
+	log            ports.Logger
+	render         infra.Render
 	repoRepository domain.RepoRepository
 }
 
-func NewRepoController(log *ports.Logger, repoRepository domain.RepoRepository) *RepoController {
+func NewRepoController(log ports.Logger, render infra.Render, repoRepository domain.RepoRepository) *RepoController {
 	log = log.With(slog.String("entity", "RepoController"))
 	s := &RepoController{
 		log:            log,
+		render:         render,
 		repoRepository: repoRepository,
 	}
 	return s
 }
 
-func (s *RepoController) Index(w http.ResponseWriter, r *http.Request) {
-	repos, err := s.repoRepository.FindAll()
+func (c *RepoController) Index(w http.ResponseWriter, r *http.Request) {
+	errors := []string{}
+	repos, err := c.repoRepository.FindAllWithRelations()
 	if err != nil {
-		fmt.Fprintf(w, "RepoController.Index fetching all repos error - %v</br>", err)
+		errors = append(errors, err.Error())
 	}
-	for i, repo := range repos {
-		fmt.Fprintf(w, "Repo %v:</br>%v</br>", i, repo)
+
+	data := struct {
+		Errors []string
+		Repos  []*models.Repo
+	}{
+		Errors: errors,
+		Repos:  repos,
 	}
+
+	c.render.HTML(w, http.StatusOK, "repos", data)
 }
 
-func (s *RepoController) Get(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "RepoController.Get is called!!!")
+func (c *RepoController) Get(w http.ResponseWriter, r *http.Request) {
+	repoID := chi.URLParam(r, "repoID")
+
+	errors := []string{}
+	repos, err := c.repoRepository.FindAllByID(repoID)
+	if err != nil {
+		errors = append(errors, err.Error())
+	}
+
+	data := struct {
+		Errors []string
+		Repos  []*models.Repo
+	}{
+		Errors: errors,
+		Repos:  repos,
+	}
+
+	c.render.HTML(w, http.StatusOK, "repo", data)
 }

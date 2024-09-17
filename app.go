@@ -1,16 +1,16 @@
 package swamp
 
 import (
+	"database/sql"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 	_ "modernc.org/sqlite" // purego sqlite3 driver
-	"xorm.io/xorm"
-	"xorm.io/xorm/names"
 
 	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/adapters/http/controllers"
@@ -19,194 +19,127 @@ import (
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
-	"github.com/davecgh/go-spew/spew"
+	slogGorm "github.com/orandin/slog-gorm"
 )
 
-func App(log *ports.Logger) int {
-	//
+// The App return code errors
+const (
+	retLoadConfigError               = 10
+	retConnectDatabaseError          = 11
+	retOpenDatabaseError             = 12
+	retMigrateDatabaseError          = 13
+	retCreateRepoRepositoryError     = 14
+	retCreateArtifactRepositoryError = 15
+	retCreateArtifactStorageError    = 16
+	retCreateChecksumServiceError    = 17
+	retCreateInputWatcherError       = 18
+	retCreateRepoRecordError         = 20
+	retCreateWebServerError          = 40
+)
+
+func App(log ports.Logger) error {
+	// EventBus
+	var bus ports.EventBus = infra.NewEventBus()
+	defer bus.Shutdown()
+
 	// Load configuration
-	//
-	repoConfigs, err := LoadRepoConfigs(log, repoConfigsFileName)
+	// TODO Embedded/layered fs!!!
+	config, err := infra.LoadConfig(log)
 	if err != nil {
-		log.Error("unable to load repo config!!!", slog.Any("err", err), slog.String("repoConfigsFileName", repoConfigsFileName))
-		return 10
+		log.Error("unable to load config!!!", slog.Any("err", err))
+		return lib.NewErrorCode(err, retLoadConfigError)
 	}
-	repoConfigs = LoadRepoConfigsDefaults(log, repoConfigs)
-	log.Info(spew.Sdump(repoConfigs))
 
 	//
 	// Open database
 	//
 	driver := "sqlite"
-	source := "file::memory:?cache=shared"
-	engine, err := xorm.NewEngine(driver, source) // using modernc.org/sqlite
+	source := "file::memory:?cache=shared&_pragma=foreign_keys(1)"
+	sqlDB, err := sql.Open(driver, source)
 	if err != nil {
 		log.Error("unable connect to database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
-		return 11
+		return lib.NewErrorCode(err, retConnectDatabaseError)
 	}
-	defer engine.Close()
-	//
+	defer sqlDB.Close()
+	dbLogger := slogGorm.New(slogGorm.WithHandler(log.Handler()))
+	db, err := gorm.Open(sqlite.Dialector{Conn: sqlDB}, &gorm.Config{
+		Logger: dbLogger,
+	})
+	if err != nil {
+		log.Error("unable open orm", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
+		return lib.NewErrorCode(err, retOpenDatabaseError)
+	}
 	// Sync database
-	//
-	engine.SetMapper(names.GonicMapper{})
-	if err := engine.Sync2(new(models.Repo), new(models.Artifact)); err != nil {
+	if err := db.AutoMigrate(new(models.Repo), new(models.Artifact)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
-		return 12
+		return lib.NewErrorCode(err, retMigrateDatabaseError)
 	}
-	//
+
 	// Create repositories
-	//
-	repoRepository, err := repository.NewRepoRepository(engine)
+	repoRepository, err := repository.NewRepoRepository(db)
 	if err != nil {
 		log.Error("unable create repo repository", slog.Any("err", err))
-		return 13
+		return lib.NewErrorCode(err, retCreateRepoRepositoryError)
 	}
-	artifactRepository, err := repository.NewArtifactRepository(engine)
+	artifactRepository, err := repository.NewArtifactRepository(db)
 	if err != nil {
 		log.Error("unable create artifact repository", slog.Any("err", err))
-		return 14
+		return lib.NewErrorCode(err, retCreateArtifactRepositoryError)
 	}
 	repositories := repository.NewRepositories(repoRepository, artifactRepository)
 
-	//
-	// Create repos
-	// TODO By hexarch that shall be in separate function in main.go using services (as accessing db and domain)
-	// TODO Some of lib.Asserts shall be part of Validate()
-	//
-	session := engine.NewSession()
-	session.Begin()
-	for k, v := range repoConfigs {
-		log := log.With(slog.String("config", k), slog.String("name", v.Name))
-		if strings.Contains(v.Name, specialRepoName) || strings.Contains(v.Input, specialRepoName) || strings.Contains(v.Storage, specialRepoName) {
-			log.Warn("wildcard repos are not supported", slog.String("input", v.Input), slog.String("storage", v.Storage))
-			continue
-		}
-		lib.Assert(v.Name != "" && !strings.Contains(v.Name, specialRepoName)) // NOTE We are not supporting wildcard/dynamic repo creations atm
-		lib.Assert(v.Input != "")                                              // NOTE We are not supporting read-only repo atm
-		lib.Assert(v.Storage != "")                                            // at least storage must be define
-
-		// Check directory as is (potentially relative)
-		if !lib.IsDirectoryExist(v.Input) {
-			log.Error("input directory does not exists", slog.String("input", v.Input))
-			continue
-		}
-		if !lib.IsDirectoryExist(v.Storage) {
-			if err := os.MkdirAll(v.Storage, os.ModePerm); err != nil { // TODO Shall it has more strick permission?
-				log.Error("storage directory can not be created", slog.Any("err", err), slog.String("storage", v.Storage))
-				continue
-			}
-		}
-
-		// Convert to abs
-		abspath, err := filepath.Abs(v.Input)
-		if err != nil {
-			log.Error("input directory can not be converted to abspath", slog.Any("err", err), slog.String("input", v.Input))
-			continue
-		}
-		if abspath != v.Input {
-			log.Debug("input directory converted to abspath", slog.String("input", v.Input), slog.String("abspath", abspath))
-			v.Input = abspath
-		}
-
-		// Add repo
-		repo, err := models.NewRepo(v.Repo)
-		if err != nil {
-			log.Error("unable create repo object", slog.Any("err", err))
-			continue
-		}
-		if _, err := session.Insert(repo); err != nil {
-			log.Error("unable insert repo record", slog.Any("err", err))
-			return 15
-		}
-	}
-	session.Commit()
-	session.Close()
-
-	//
 	// Create artifact storage
-	//
-	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, engine)
+	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, db)
 	if err != nil {
 		log.Error("unable to create artifact storage", slog.Any("err", err))
-		return 16
+		return lib.NewErrorCode(err, retCreateArtifactStorageError)
 	}
 	defer artifactStorage.Close()
-
-	//
+	// Create artifacts service:
+	// - create artifacts by new checksum files
+	// - checking artifacts in storage
+	artifactService, err := NewArtifactService(log, bus, artifactStorage, repositories)
+	if err != nil {
+		log.Error("unable to create artifact service", slog.Any("err", err))
+		return lib.NewErrorCode(err, retCreateChecksumServiceError)
+	}
+	defer artifactService.Close()
+	// Create repo service
+	repoService := NewRepoService(log, bus, infra.NewFilepathWalk(), repositories)
+	defer repoService.Close()
 	// Create filesystem watcher for input files
-	//
-	inputWatcher, err := NewWatcherService(log, "input")
+	inputWatcher, err := infra.NewWatcherService("input", log, bus)
 	if err != nil {
 		log.Error("unable to create new watcher service", slog.Any("err", err))
-		return 17
+		return lib.NewErrorCode(err, retCreateInputWatcherError)
 	}
 	defer inputWatcher.Close()
 
-	//
-	// Create service reacting to new checksum files
-	//
-	checksumService, err := NewChecksumService(log, inputWatcher, artifactStorage, repositories)
-	if err != nil {
-		log.Error("unable to create checksum service", slog.Any("err", err))
-		return 18
-	}
-	defer checksumService.Close()
-
-	// TODO Traversal all repos and "bind" "services". Order is undecided atm
-	// TODO We could rescan added dir during AddDir to generate events to binded
-	// TODO service for processing artifacts stored prior
-	err = repoRepository.IterateAll(func(repo *models.Repo) (bool, error) {
-		err := inputWatcher.AddDir(repo.Input)
-		if err != nil {
-			log.Error("unable add dir to input watcher", slog.Any("err", err), slog.String("input", repo.Input))
-		}
-		return true, nil
-	})
-	if err != nil {
-		log.Error("failure during adding dir to input watcher", slog.Any("err", err))
-		return 19
+	// Perform neccesery startup operations
+	if err := startup(log, config, bus, repoRepository); err != nil {
+		return err
 	}
 
-	go func() { // DEBUG this is debug purpose only function
-		ch := inputWatcher.GetChanRemoved()
-		for name := range ch {
-			log.Info("chan removed", slog.String("path", name))
-		}
-		log.Info("chan rm go done")
-	}()
-
-	// TODO Create artifacts validator/mover to trash (might need to be done early due to
-	//      dynamic repos already created before)
-
-	//
 	// Create router
-	//
 	router := adapters.NewRouter(log)
-	//
 	// Create render object
-	// It will load templates
-	//
+	// It also loads templates
 	render := infra.NewRender()
-	//
 	// Create controllers
-	//
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
-	repoContoller := controllers.NewRepoController(log, repoRepository)
-	artifactController := controllers.NewArtifactController(log, artifactRepository)
-	//
+	repoContoller := controllers.NewRepoController(log, render, repoRepository)
+	artifactController := controllers.NewArtifactController(log, render, artifactRepository)
 	// Add routes
-	//
 	router.Get("/", frontPageController.Index)
 	router.Get("/repos", repoContoller.Index)
-	router.Route("/repo", func(router ports.Router) {
-		router.Get("/", repoContoller.Index)
-		router.Get("/{repoName}", repoContoller.Get)
-	})
 	router.Get("/artifacts", artifactController.Index)
-	router.Route("/artifact", func(router ports.Router) {
-		router.Get("/", artifactController.Index)
-		router.Get("/{artifactID}", artifactController.Get)
-	})
+	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
+	router.Get("/repo/{repoID}", repoContoller.Get)
+	// Static file handler
+	fileServer := http.FileServer(http.Dir("./static/"))
+	router.Handle("/static/*", http.StripPrefix("/static", fileServer))
+	// 404 handler
+	router.NotFound(frontPageController.NotFound)
 	// Create http server
 	// The router must has all routes already
 	// It will start server in separate goroutine
@@ -214,15 +147,14 @@ func App(log *ports.Logger) int {
 	httpServer, err := infra.NewWebServer(log, addr, router)
 	if err != nil {
 		log.Error("unable create web server", slog.Any("err", err), slog.String("addr", addr))
-		return 20
+		return lib.NewErrorCode(err, retCreateWebServerError)
 	}
 
-	//
 	// Add ctrl-c shutdown
-	//
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	log.Info("press ctrl-c to exit")
+	// Wait for ctrl-c
 	<-c
 
 	// Close http server
@@ -230,10 +162,6 @@ func App(log *ports.Logger) int {
 	// Close watcher by ctrl-c
 	inputWatcher.Close()
 
-	// Dump whole db to test file
-	dumpFile := "./swamp_db.txt"
-	err = engine.DumpAllToFile(dumpFile)
-	log.Error("dump whole db to file", slog.String("dumpFile", dumpFile), slog.Any("err", err))
-
-	return 0
+	// TODO Optionally dump whole db to test file
+	return nil
 }

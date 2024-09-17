@@ -1,6 +1,7 @@
-package swamp
+package infra
 
 import (
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"sync"
@@ -12,27 +13,15 @@ import (
 )
 
 type WatcherService struct {
-	id           string
-	log          *ports.Logger
-	watcher      *fsnotify.Watcher
-	chanModified chan string
-	chanRemoved  chan string
-	closeWg      sync.WaitGroup
+	id             string
+	log            ports.Logger
+	bus            ports.EventBus
+	chInputUpdated chan ports.Event
+	watcher        *fsnotify.Watcher
+	closeWg        sync.WaitGroup
 }
 
-type InputWatcherService interface {
-	GetChanModified() chan string
-}
-
-func (s *WatcherService) GetChanModified() chan string {
-	return s.chanModified
-}
-
-func (s *WatcherService) GetChanRemoved() chan string {
-	return s.chanRemoved
-}
-
-func NewWatcherService(log *ports.Logger, id string) (*WatcherService, error) {
+func NewWatcherService(id string, log ports.Logger, bus ports.EventBus) (*WatcherService, error) {
 	log = log.With(slog.String("entity", "WatcherService"), slog.String("id", id))
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -40,11 +29,11 @@ func NewWatcherService(log *ports.Logger, id string) (*WatcherService, error) {
 	}
 
 	s := &WatcherService{
-		id:           id,
-		log:          log,
-		watcher:      watcher,
-		chanModified: make(chan string, 1),
-		chanRemoved:  make(chan string, 1),
+		id:             id,
+		log:            log,
+		bus:            bus,
+		chInputUpdated: bus.Sub(ports.TopicInputUpdated),
+		watcher:        watcher,
 	}
 	log.Info("created")
 
@@ -53,8 +42,6 @@ func NewWatcherService(log *ports.Logger, id string) (*WatcherService, error) {
 		defer s.closeWg.Done()
 		log.Info("process started")
 		defer log.Warn("process complete")
-		defer close(s.chanModified)
-		defer close(s.chanRemoved)
 		s.background()
 	}()
 
@@ -70,17 +57,19 @@ func (s *WatcherService) Close() {
 	}
 
 	s.log.Info("closing")
+	s.bus.Unsub(s.chInputUpdated)
 	s.watcher.Close()
 	s.closeWg.Wait()
 	s.watcher = nil
 }
 
-// WARN The remove of path would remove if from watch list
+// WARN The remove of path would remove if from watch list inside the fsnotify!!!
 // WARN	Such even would be communcated by remove event with name of path
 // TODO Handle reassignment transparently in process(). Make the test
 // TODO Auto assing recursive directiry creation. Do not watch once removed. Make the test
-func (s *WatcherService) AddDir(path string) error {
+func (s *WatcherService) addDir(path string) error {
 	log := s.log
+	lib.Assert(lib.IsAbs(path))
 	if abspath, err := filepath.Abs(path); abspath != path || err != nil {
 		log.Error("add dir failed!!!", slog.Any("err", err), slog.String("path", path), slog.String("abspath", abspath))
 		return errors.ErrMustBeAbsPath
@@ -94,9 +83,19 @@ func (s *WatcherService) AddDir(path string) error {
 }
 
 func (s *WatcherService) background() {
-	log := s.log
+	log, bus := s.log, s.bus
+	topicFileModified := fmt.Sprintf("%v-file-modified", s.id)
+	topicFileRemoved := fmt.Sprintf("%v-file-removed", s.id)
 	for {
 		select {
+		case event, ok := <-s.chInputUpdated:
+			log.Debug("watcher event", slog.Any("event", event))
+			if !ok {
+				return
+			}
+			for _, path := range event {
+				s.addDir(path)
+			}
 		case err, ok := <-s.watcher.Errors:
 			if err != nil {
 				log.Error("watcher error", slog.Any("err", err))
@@ -115,7 +114,7 @@ func (s *WatcherService) background() {
 				dir := file
 				log := log.With(slog.String("dir", dir))
 				log.Debug("directory created")
-				err := s.AddDir(dir)
+				err := s.addDir(dir)
 				if err != nil {
 					log.Error("unable to add recursive dir")
 				}
@@ -124,20 +123,20 @@ func (s *WatcherService) background() {
 			if event.Has(fsnotify.Create) {
 				size := lib.FileSize(file)
 				log.Debug("file created", slog.String("file", file), slog.Int64("size", size))
-				s.chanModified <- file
+				bus.Pub(topicFileModified, ports.Event{file})
 			}
 			if event.Has(fsnotify.Write) {
 				size := lib.FileSize(file)
 				log.Debug("file modified", slog.String("file", file), slog.Int64("size", size))
-				s.chanModified <- file
+				bus.Pub(topicFileModified, ports.Event{file})
 			}
 			if event.Has(fsnotify.Rename) {
 				log.Debug("file renamed", slog.String("file", file))
-				s.chanRemoved <- file
+				bus.Pub(topicFileRemoved, ports.Event{file})
 			}
 			if event.Has(fsnotify.Remove) {
 				log.Debug("file removed", slog.String("file", file))
-				s.chanRemoved <- file
+				bus.Pub(topicFileRemoved, ports.Event{file})
 			}
 		}
 	}
