@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -11,7 +13,9 @@ import (
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 )
 
@@ -119,7 +123,7 @@ func (s *ArtifactService) background() {
 				// Create new artifacts
 				artifacts := append(goodFiles, path)
 				id := lib.GetFirstSubdir(repo.Input, path)
-				artifactID, createdAt, err := artifactStorage.NewArtifact(repo, id, artifacts)
+				artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo, id, artifacts)
 				if err != nil {
 					log.Error("unable to create new artifacts", slog.Any("err", err))
 				}
@@ -151,6 +155,7 @@ func (s *ArtifactService) background() {
 				artifact := &models.Artifact{
 					ID:        artifactID,
 					RepoID:    repo.ID,
+					Size:      types.Size(size),
 					CreatedAt: createdAt,
 					Checksum:  checksum,
 				}
@@ -182,7 +187,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 
 	loc := filepath.Join(repo.Storage, artifactID)
-	createdAt, checksum, err := s.verifyArtifact(loc)
+	size, createdAt, checksum, err := s.verifyArtifact(loc)
 	if err != nil {
 		log.Error("unable to verify aritfact", slog.Any("err", err))
 		s.bus.Pub(ports.TopicBrokenRepoArtifact, ports.Event{repoID, artifactID})
@@ -198,11 +203,14 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 		log.Info("dangling artifact")
 		artifact.ID = artifactID
 		artifact.RepoID = repoID
+		artifact.Size = types.Size(size)
 		artifact.Checksum = checksum
 		artifact.CreatedAt = createdAt
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
 			log.Error("unable create artifact record", slog.Any("err", err))
+			return
 		}
+		log.Info("artifact re-created")
 		return
 	}
 	if artifact.ID != artifactID {
@@ -227,6 +235,78 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 // The verifyArtifact check the location
 // has only artifact files,
 // and returns createdAt, checksum or error
-func (s *ArtifactService) verifyArtifact(location string) (int64, string, error) {
-	return 12345678, "xxxxxxxx", nil
+func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string, error) {
+	checksumFile, files := "", []string{}
+
+	w := infra.NewFilepathWalk()
+	w.Walk(location, func(name string, err error) (bool, error) {
+		if err != nil {
+			s.log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))
+			return true, nil
+		}
+		if lib.IsDirectoryExist(name) {
+			return true, nil
+		}
+		if adapters.IsChecksumFile(name) {
+			if checksumFile != "" {
+				s.log.Error("second checksum file detected", slog.String("checksumFile", checksumFile), slog.String("name", name))
+				return true, nil
+			}
+			checksumFile = name
+		}
+		files = append(files, name)
+		return true, nil
+	})
+
+	checksum, goodFiles, badFiles, err := adapters.CheckChecksum(s.log, checksumFile)
+	if err != nil {
+		s.log.Error("unable to checksum artifact", slog.String("checksumFile", checksumFile), slog.Any("err", err))
+		return 0, 0, "", errors.ErrArtifactIsBroken
+	}
+	if len(badFiles) > 0 {
+		s.log.Error("bad files detected", slog.String("checksumFile", checksumFile), slog.Any("badFiles", badFiles))
+		return 0, 0, "", errors.ErrArtifactIsBroken
+	}
+
+	if !slices.Contains(goodFiles, checksumFile) {
+		s.log.Warn("checksum file is not in checksum file")
+		goodFiles = append(goodFiles, checksumFile)
+	}
+	createdAtName := filepath.Join(filepath.Dir(checksumFile), "_createdAt.txt")
+	if !slices.Contains(goodFiles, createdAtName) {
+		s.log.Warn("createdAt file is not in checksum file")
+		goodFiles = append(goodFiles, createdAtName)
+	}
+
+	if len(goodFiles) != len(files) {
+		s.log.Error("missmatch between good and actual files", slog.Any("goodFiles", goodFiles), slog.Any("files", files))
+		return 0, 0, "", errors.ErrArtifactIsBroken
+	}
+
+	slices.Sort(goodFiles)
+	slices.Sort(files)
+	if slices.Compare(goodFiles, files) != 0 {
+		s.log.Error("different files listed in good and actual files", slog.Any("goodFiles", goodFiles), slog.Any("files", files))
+		return 0, 0, "", errors.ErrArtifactIsBroken
+	}
+
+	// Read back creation time
+	a, err := os.ReadFile(createdAtName)
+	if err != nil {
+		s.log.Warn("unable to read", slog.String("file", createdAtName), slog.Any("err", err))
+	}
+	// Once external creation time might be created with tailing \n or even more
+	// parse only leading digits and ignore rest
+	t, err := strconv.ParseInt(lib.LeadingDigits(string(a)), 10, 64)
+	if err != nil {
+		s.log.Warn("unable convert creation time", slog.Any("err", err))
+	}
+	createdAt := t
+
+	size := int64(0)
+	for _, file := range goodFiles {
+		size += lib.FileSize(file)
+	}
+
+	return size, createdAt, checksum, nil
 }

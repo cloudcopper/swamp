@@ -5,5 +5,5 @@ import (
 )
 
 type ArtifactStorage interface {
-	NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, error)
+	NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error)
 }

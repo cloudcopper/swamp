@@ -1,29 +1,44 @@
 TODO
 ====
-- Abstract out storage!!!!
--- Currently it is filesystem but make it more flexible?
+- retention/artifacts checks functionality
+-- starts 30 minutes after app startup
+-- periodic, evenly distributed or with minimal interval (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
+-- artifacts should be first marked as exipred (State field)
+-- mark artifact broken (State field)
+-- if repo has no broken defined artifacts presents all the time
+-- if artifact is not OK (either expired or broken)
+-- expired artifacts deleted on second cicle
+-- broken artifacts suppose to be moved on second cicle
+-- broken as /dev/null means to be deleted
 
-- nicer ui (use template and repository to fetch Repo with Atrifacts info, probably also fillup info from fs too?)
--- clickable cards
--- https://wikiki.github.io/components/timeline/
+- nicer Repo.Size handling (see TODO in code)
 
-- add to model "tags" (with optional url?)
-
-- meta ??? use similar to the checksum algo way
--- with blacklist for some variables?
+- meta for artifacts. use similar to the checksum algo way???
+-- with blacklist for some variables - i.e *PASSWORD* value should be *************
 -- meta is many to many?
+-- with url support (to have i.e. back links)
 
-- Use OptWithLogger to pass log into New... ?
-- How to be with checksum algos?
-- infra/config for repo_config? how to pass/embedd file and make nice vendoring? fs.embed layers?
-- fsnotify to ports/adapters ?
-- filesystem ports/adapters for tests and mocking? 
-- test coverage
-- tests!!!
-- cut of infra out of adapters
-- favicon.ico (to avoid 404 when browser goes in)
+- meta for repos
+-- with url support (to have links to i.e. bugtracker)
+-- defined trough config
+-- do we need artifacts by meta search?
+
+- artifacts download as separate file or aggregate (.zip)
+-- broken artifacts can not be downloaded within single click (figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id)
+-- webui marks broken files in artifact as well whole artifact
+
+CUSTOM.md - how to customize
+
+- nicer ui
+-- main page - swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short
+-- repo page - repo summary and meta, repo artifacts summary, artifacts (pagination? calendar separation? meta search?)
+-- artifact page - artifact details, files and their status, metas, meta filters
+-- broken artifact warning page/mechanism ?
+-- custom 404 ?
+
+- tests - increate test coverage
+
+- access log
 - input web (the way to put over http new artifacts)
-
-- correct generic_repository.go for gorm
-
-- time.Duration to use y(ear) m(onth) w(eek) d(ay). In particular for Retention
+- abstract out storage
+-- currently it is filesystem but may it be more flexible? minio?

@@ -31,7 +31,7 @@ func NewBasicArtifactStorageAdapter(log ports.Logger, db ports.DB) (*BasicArtifa
 	return s, nil
 }
 
-func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.ArtifactID, artifacts []string) (models.ArtifactID, int64, error) {
+func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.ArtifactID, artifacts []string) (models.ArtifactID, int64, int64, error) {
 	lib.Assert(repo != nil)
 	lib.Assert(len(artifacts) >= 1)
 	log := s.log
@@ -43,18 +43,19 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.A
 	log.Info("add artifacts", slog.String("storage", storage), slog.Any("files", artifacts))
 
 	if !lib.IsDirectoryExist(storage) {
-		return "", 0, lib.ErrNoSuchDirectory{Path: storage}
+		return "", 0, 0, lib.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
 	if lib.IsDirectoryExist(dest) {
-		return "", 0, errors.ErrArtifactAlreadyExists{Path: dest}
+		return "", 0, 0, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
 	if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 
 	input := repo.Input
+	size := int64(0)
 	for _, fileName := range artifacts {
 		// The input mist be sanitized already!!!
 		lib.Assert(lib.IsSecureFileName(fileName))
@@ -67,12 +68,14 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.A
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
 			if err := os.MkdirAll(dest, os.ModePerm); err != nil {
-				return "", 0, err
+				return "", 0, 0, err
 			}
 		}
-		if err := os.Rename(fileName, filepath.Join(dest, file)); err != nil {
-			return "", 0, err
+		newpath := filepath.Join(dest, file)
+		if err := os.Rename(fileName, newpath); err != nil {
+			return "", 0, 0, err
 		}
+		size = size + lib.FileSize(newpath)
 	}
 
 	// Optional create file _createdAt.txt containing epoch time.
@@ -98,7 +101,7 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.A
 	}
 	createdAt := t
 
-	return id, createdAt, nil
+	return id, size, createdAt, nil
 }
 
 func (s *BasicArtifactStorageAdapter) Close() {

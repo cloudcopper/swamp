@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>swamp - only minimalistic artifacts storage</title>
-  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <style>
@@ -48,10 +48,12 @@
       </a>
     </div>
     <div class="navbar-menu">
+      <!--
       <div class="navbar-start">
         <a class="navbar-item" href="/repos">Repos</a>
         <a class="navbar-item" href="/artifacts">Artifacts</a>
       </div>
+      -->
     </div>
   </nav>
 
@@ -149,7 +151,7 @@
           <div class="control">
             <div class="tags has-addons">
               <span class="tag is-medium">total size</span>
-              <span class="tag is-medium is-success">1.4GB</span>
+              <span class="tag is-medium is-success">{{.Size}}</span>
             </div>
           </div>
         </div>
@@ -221,7 +223,7 @@
           <div class="control">
             <div class="tags has-addons">
               <span class="tag is-medium">size</span>
-              <span class="tag is-medium is-warning">720MB</span>
+              <span class="tag is-medium is-warning">{{.Size}}</span>
             </div>
           </div>
         </div>

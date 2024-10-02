@@ -1,4 +1,4 @@
-package adapters
+package infra
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/lib"
 )
@@ -91,5 +92,5 @@ func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error)
 }
 
 func init() {
-	RegisterChecksumAlgo(100000, "*.sha256sum", &Sha256{})
+	adapters.RegisterChecksumAlgo(100000, "*.sha256sum", &Sha256{})
 }

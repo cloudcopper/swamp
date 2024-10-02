@@ -6,6 +6,7 @@ require (
 	github.com/charlievieth/fastwalk v1.0.8
 	github.com/cloudcopper/misc v0.1.0
 	github.com/cskr/pubsub/v2 v2.0.2
+	github.com/dustin/go-humanize v1.0.1
 	github.com/fsnotify/fsnotify v1.7.1-0.20240516151259-c1467c02fba5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-playground/validator/v10 v10.22.1
@@ -23,7 +24,6 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect

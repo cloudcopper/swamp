@@ -2,10 +2,8 @@
 
 # Default parameters
 _defaults: &defaults
-  input2:       "{{.TOP}}/input/${REPO_ID}"
-  storage2:     "{{.TOP}}/storage/${REPO_ID}"
-  input:       "/home/egorse/projects/swamp/examples/six-repos/input/${REPO_ID}"
-  storage:     "/home/egorse/projects/swamp/examples/six-repos/storage/${REPO_ID}"
+  input:       "{{.TOP}}/input/${REPO_ID}"
+  storage:     "{{.TOP}}/storage/${REPO_ID}"
 
 _1day: &1day
   retention:   "24h" # 1d
@@ -14,6 +12,7 @@ _2weeks: &2weeks
   retention:   "336h" # 14d
 
 # Repositories
+# The repo id must not start from _
 abc-gen1:
   <<:          [*defaults, *1day]
   name:        "ABC Gen1"

@@ -1,4 +1,4 @@
-package adapters
+package http
 
 import (
 	"github.com/cloudcopper/swamp/ports"

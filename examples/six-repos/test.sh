@@ -2,7 +2,7 @@
 set -ex
 
 # WARNING: This file is by no any means an example how to run swamp
-#          but script to utilize the configuration,
+#          but script to utilize the example configuration (six-repos.yml),
 #          and populate repositories for demo and test purpose only.
 #          It will spawn the swamp in background and start the shell.
 #          When the shell is exited, the swamp will be stopped.

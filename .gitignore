@@ -1,6 +1,9 @@
 .*
 !.gitignore
+!.keepme
 testdata/tmp
 /swamp
 /cmd/swamp/swamp
 vendor/
+cover.out
+cover.html

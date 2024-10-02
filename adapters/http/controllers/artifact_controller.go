@@ -34,12 +34,17 @@ func (c *ArtifactController) Index(w http.ResponseWriter, r *http.Request) {
 		errors = append(errors, err.Error())
 	}
 
+	perPage := 20
+	artifacts, artifactsPage := helperPagination(r, artifacts, perPage)
+
 	data := struct {
-		Errors    []string
-		Artifacts []*models.Artifact
+		Errors        []string
+		Artifacts     []*models.Artifact
+		ArtifactsPage int
 	}{
-		Errors:    errors,
-		Artifacts: artifacts,
+		Errors:        errors,
+		Artifacts:     artifacts,
+		ArtifactsPage: artifactsPage,
 	}
 
 	c.render.HTML(w, http.StatusOK, "artifacts", data)
@@ -56,11 +61,11 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Errors    []string
-		Artifacts []*models.Artifact
+		Errors   []string
+		Artifact *models.Artifact
 	}{
-		Errors:    errors,
-		Artifacts: []*models.Artifact{artifact},
+		Errors:   errors,
+		Artifact: artifact,
 	}
 
 	c.render.HTML(w, http.StatusOK, "artifact", data)

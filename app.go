@@ -2,8 +2,8 @@ package swamp
 
 import (
 	"database/sql"
+	"embed"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,10 +13,12 @@ import (
 	_ "modernc.org/sqlite" // purego sqlite3 driver
 
 	"github.com/cloudcopper/swamp/adapters"
+	"github.com/cloudcopper/swamp/adapters/http"
 	"github.com/cloudcopper/swamp/adapters/http/controllers"
 	"github.com/cloudcopper/swamp/adapters/repository"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
+	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 	slogGorm "github.com/orandin/slog-gorm"
@@ -24,6 +26,7 @@ import (
 
 // The App return code errors
 const (
+	retLayerFilesystemError          = 9
 	retLoadConfigError               = 10
 	retConnectDatabaseError          = 11
 	retOpenDatabaseError             = 12
@@ -37,14 +40,28 @@ const (
 	retCreateWebServerError          = 40
 )
 
-func App(log ports.Logger) error {
+// App execute application and returns error, when complete by ctrl-c.
+// The application reads config(s), templates and static web files
+// from layered filesystem.
+// Layered filesystem consists of next layers:
+//   - ./ of ${SWAMP_ROOT} (optional)
+//   - ./ of current working directory
+//   - embed.fs given as parameter (cmdFS)
+//   - package own embed.fs (appFS)
+func App(log ports.Logger, cmdFS embed.FS) error {
 	// EventBus
 	var bus ports.EventBus = infra.NewEventBus()
 	defer bus.Shutdown()
 
+	// Create layered filesystem
+	fs, err := infra.NewLayerFileSystem(config.TopRootFileSystemPath, os.Getwd, cmdFS, appFS)
+	if err != nil {
+		log.Error("unable to create layered filesystem!!!", slog.Any("err", err))
+		return lib.NewErrorCode(err, retLayerFilesystemError)
+	}
+
 	// Load configuration
-	// TODO Embedded/layered fs!!!
-	config, err := infra.LoadConfig(log)
+	config, err := config.LoadConfig(log, fs)
 	if err != nil {
 		log.Error("unable to load config!!!", slog.Any("err", err))
 		return lib.NewErrorCode(err, retLoadConfigError)
@@ -121,23 +138,21 @@ func App(log ports.Logger) error {
 	}
 
 	// Create router
-	router := adapters.NewRouter(log)
+	router := http.NewRouter(log)
 	// Create render object
 	// It also loads templates
-	render := infra.NewRender()
+	render := infra.NewRender(fs)
 	// Create controllers
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository)
 	// Add routes
 	router.Get("/", frontPageController.Index)
-	router.Get("/repos", repoContoller.Index)
-	router.Get("/artifacts", artifactController.Index)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
 	router.Get("/repo/{repoID}", repoContoller.Get)
 	// Static file handler
-	fileServer := http.FileServer(http.Dir("./static/"))
-	router.Handle("/static/*", http.StripPrefix("/static", fileServer))
+	fileServer := http.FileServer(http.FS(fs))
+	router.Handle("/static/*", fileServer)
 	// 404 handler
 	router.NotFound(frontPageController.NotFound)
 	// Create http server
@@ -162,6 +177,6 @@ func App(log ports.Logger) error {
 	// Close watcher by ctrl-c
 	inputWatcher.Close()
 
-	// TODO Optionally dump whole db to test file
+	// TODO Optionally dump whole db to debug file ?
 	return nil
 }

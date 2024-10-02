@@ -29,7 +29,7 @@ func NewFrontPageController(log ports.Logger, render infra.Render, repos domain.
 
 func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 	errors := []string{}
-	repos, err := c.repos.Repo().FindAllWithRelations()
+	repos, err := c.repos.Repo().FindAll(ports.WithRelationship(true))
 	if len(repos) == 0 && err == nil {
 		err = lib.Error("ERROR: No repository found!!! Configuration problem ???")
 	}
@@ -42,14 +42,19 @@ func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 		errors = append(errors, err.Error())
 	}
 
+	perPage := 20
+	artifacts, artifactsPage := helperPagination(r, artifacts, perPage)
+
 	data := struct {
-		Errors    []string
-		Repos     []*models.Repo
-		Artifacts []*models.Artifact
+		Errors        []string
+		Repos         []*models.Repo
+		Artifacts     []*models.Artifact
+		ArtifactsPage int
 	}{
-		Errors:    errors,
-		Repos:     repos,
-		Artifacts: artifacts,
+		Errors:        errors,
+		Repos:         repos,
+		Artifacts:     artifacts,
+		ArtifactsPage: artifactsPage,
 	}
 
 	c.render.HTML(w, http.StatusOK, "index", data)

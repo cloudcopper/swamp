@@ -1,8 +1,8 @@
-package infra
+package config
 
 import (
-	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"regexp"
@@ -10,14 +10,11 @@ import (
 
 	tpl "github.com/cloudcopper/misc/env/template"
 	"github.com/cloudcopper/swamp/domain/models"
-	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 
 	"gopkg.in/yaml.v3"
 )
 
-// TODO Remove out of this file defRepoConfingFIleName and repoConfigFileName
-// TODO Use some layered FS?
 type Config struct {
 	Repos map[string]models.Repo
 }
@@ -42,17 +39,15 @@ func (c *Config) String() string {
 }
 
 const refRepoID = "${REPO_ID}"
-const defaultReposConfigFileName = "swamp_repos.yml"
 
-var reposConfigFileName = lib.GetEnvDefault("SWAMP_REPO_CONFIG", defaultReposConfigFileName)
+var (
+	ReposConfigFileName   = "swamp_repos.yml"
+	TopRootFileSystemPath = ""
+)
 
-//go:embed *.go
-var _fs embed.FS // TODO originally *.yml !!! TODO Name!!!
-
-func LoadConfig(log ports.Logger) (*Config, error) {
-	config, err := loadReposConfig(log, reposConfigFileName)
+func LoadConfig(log ports.Logger, fs fs.ReadFileFS) (*Config, error) {
+	config, err := loadReposConfig(log, fs, ReposConfigFileName)
 	if err != nil {
-		log.Error("unable to load repos config!!!", slog.Any("err", err), slog.String("repoConfigsFileName", reposConfigFileName))
 		return config, err
 	}
 	config = processReposConfigs(log, config)
@@ -65,18 +60,14 @@ func LoadConfig(log ports.Logger) (*Config, error) {
 	return config, nil
 }
 
-// The loadReposConfig reads named repos configs file from filesystem,
-// optionally fallback to embedded filesystem,
+// The loadReposConfig reads named repos configs file from given fs,
 // execute file as env template,
 // and unmarshal result to the config
-func loadReposConfig(log ports.Logger, fileName string) (*Config, error) {
+func loadReposConfig(log ports.Logger, fs fs.ReadFileFS, fileName string) (*Config, error) {
 	log.Info("loading repos config", slog.String("fileName", fileName))
-	// try load from real filesystem
 	blob, err := os.ReadFile(fileName)
 	if err != nil {
-		// fallback to read from embedded filesystem
-		log.Info("fallback to embedded repos config", slog.String("fileName", fileName))
-		blob, err = _fs.ReadFile(fileName)
+		blob, err = fs.ReadFile(fileName)
 		if err != nil {
 			return nil, err
 		}

@@ -4,12 +4,12 @@ import (
 	"log/slog"
 
 	"github.com/cloudcopper/swamp/domain"
-	"github.com/cloudcopper/swamp/infra"
+	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 )
 
-func startup(log ports.Logger, config *infra.Config, bus ports.EventBus, repoRepository domain.RepoRepository) error {
+func startup(log ports.Logger, config *config.Config, bus ports.EventBus, repoRepository domain.RepoRepository) error {
 	//
 	// Create repo models
 	//
