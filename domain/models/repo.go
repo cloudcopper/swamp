@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
 )
@@ -18,10 +19,25 @@ type Repo struct {
 	Retention   types.Duration `gorm:"int64" validate:"min=0"`
 	Broken      string         `gorm:"string" validate:"omitempty,min=3,eq=/dev/null|dir,abspath,nefield=Input,nefield=Storage"`
 	Size        types.Size     `gorm:"int64" validate:"min=0"`
+	Meta        RepoMetas      `gorm:"foreignKey:RepoID" validate:"-"`
 	Artifacts   []*Artifact    `gorm:"foreignKey:RepoID" yaml:"-" validate:"-"`
 }
 
 func (model *Repo) Validate() error {
 	err := lib.Validate.Struct(model)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, m := range model.Meta {
+		if m.RepoID == "" {
+			m.RepoID = model.ID
+			continue
+		}
+		if m.RepoID != model.ID {
+			return errors.ErrIncorrectMetaID
+		}
+	}
+
+	return nil
 }

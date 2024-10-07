@@ -11,6 +11,7 @@ const ErrChecksumFileHasBrokenFiles = lib.Error("checksum file has broken file(s
 const ErrIsNotChecksumFile = lib.Error("is not checksum file")
 const ErrUnsecureFileName = lib.Error("unsecure file name")
 const ErrArtifactIsBroken = lib.Error("artifact is broken")
+const ErrIncorrectMetaID = lib.Error("incorrect meta id")
 
 type ErrArtifactAlreadyExists struct {
 	Path string

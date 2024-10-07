@@ -22,6 +22,10 @@ abc-gen1:
                 nulla id feugiat mattis eget augue. Vehicula suscipit dictum
                 molestie vestibulum eros eleifend, inceptos gravida dictum eget
                 est eu suscipit, nisl commodo libero aenean eget.
+  meta:
+    "key1": "value1"
+    "key2": "value2"
+    "bugs": "http://some-site.com/"
 
 abc-gen2:
   <<:          [*defaults, *1day]

@@ -87,7 +87,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 		return lib.NewErrorCode(err, retOpenDatabaseError)
 	}
 	// Sync database
-	if err := db.AutoMigrate(new(models.Repo), new(models.Artifact)); err != nil {
+	if err := db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
 		return lib.NewErrorCode(err, retMigrateDatabaseError)
 	}

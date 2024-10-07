@@ -6,6 +6,7 @@ import (
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
+	"gorm.io/gorm"
 )
 
 type RepoRepository struct {
@@ -24,10 +25,13 @@ func (r *RepoRepository) Create(model *models.Repo) error {
 	if err := model.Validate(); err != nil {
 		return fmt.Errorf("invalid repo object: %w", err)
 	}
-	if err := r.db.Save(model).Error; err != nil {
-		return fmt.Errorf("unable to save repo object: %w", err)
-	}
-	return nil
+	err := r.db.Transaction(func(db *gorm.DB) error {
+		if err := db.Create(model).Error; err != nil {
+			return fmt.Errorf("unable to save repo object: %w", err)
+		}
+		return nil
+	})
+	return err
 }
 
 func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
@@ -38,6 +42,9 @@ func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
 		switch v := flag.(type) {
 		case ports.WithRelationship:
 			if v {
+				db = db.Preload("Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
+				})
 				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
 					return db.Order("created_at DESC")
 				})

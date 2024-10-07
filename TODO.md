@@ -17,11 +17,6 @@ TODO
 -- meta is many to many?
 -- with url support (to have i.e. back links)
 
-- meta for repos
--- with url support (to have links to i.e. bugtracker)
--- defined trough config
--- do we need artifacts by meta search?
-
 - artifacts download as separate file or aggregate (.zip)
 -- broken artifacts can not be downloaded within single click (figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id)
 -- webui marks broken files in artifact as well whole artifact
@@ -33,9 +28,12 @@ CUSTOM.md - how to customize
 -- repo page - repo summary and meta, repo artifacts summary, artifacts (pagination? calendar separation? meta search?)
 -- artifact page - artifact details, files and their status, metas, meta filters
 -- broken artifact warning page/mechanism ? should prohibit from simplest curl/wget downloads - sort of requires random URL instead valid file name?
+- more nicer ui
+-- meta values colorization humanization (i.e. automatically shows as symlink https:// and etc)
 -- custom 404 ?
 
 - tests - increate test coverage
+- test - pagination seems fails on empty input data
 
 - access log
 - input web (the way to put over http new artifacts)

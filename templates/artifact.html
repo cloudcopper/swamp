@@ -12,5 +12,10 @@
 
     <h2>Files</h2>
 
+    {{if .Meta}}
     <h2>Meta</h2>
+    {{range .Meta}}
+        <p>{{.Key}}:<span>{{.Value}}</span></p>
+    {{end}}
+    {{end}}
 {{end}}
