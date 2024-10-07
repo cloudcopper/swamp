@@ -13,6 +13,7 @@ import (
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/domain/vo"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
@@ -156,6 +157,7 @@ func (s *ArtifactService) background() {
 					ID:        artifactID,
 					RepoID:    repo.ID,
 					Size:      types.Size(size),
+					State:     vo.ArtifactIsOK,
 					CreatedAt: createdAt,
 					Checksum:  checksum,
 				}
