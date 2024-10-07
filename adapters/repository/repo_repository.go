@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 )
 
@@ -45,15 +46,8 @@ func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
 	}
 
 	err := db.Find(&repos).Error
-
-	// TODO ATM the Repo.Size is not in the DB
-	// and we populate it only here.
-	// How can it be maintaned well with respect to add/remove artifacts dynamically?
-	// Can it be in DB and then we update it when checking dangling repos, adding new or remove expired or broken?
 	for _, r := range repos {
-		for _, a := range r.Artifacts {
-			r.Size += a.Size
-		}
+		lib.Assert(len(r.Artifacts) == 0 || r.Size > 0)
 	}
 
 	return repos, err

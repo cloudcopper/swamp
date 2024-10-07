@@ -9,8 +9,8 @@ TODO
 -- expired artifacts deleted on second cicle
 -- broken artifacts suppose to be moved on second cicle
 -- broken as /dev/null means to be deleted
-
-- nicer Repo.Size handling (see TODO in code)
+-- Handle manual artifact removal from artifact storage
+-- reduce Repo.Size on artifact removal
 
 - meta for artifacts. use similar to the checksum algo way???
 -- with blacklist for some variables - i.e *PASSWORD* value should be *************
@@ -29,10 +29,10 @@ TODO
 CUSTOM.md - how to customize
 
 - nicer ui
--- main page - swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short
+-- main page - shameless swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short. Has way to download latest artifact from repo view and from artifact view.
 -- repo page - repo summary and meta, repo artifacts summary, artifacts (pagination? calendar separation? meta search?)
 -- artifact page - artifact details, files and their status, metas, meta filters
--- broken artifact warning page/mechanism ?
+-- broken artifact warning page/mechanism ? should prohibit from simplest curl/wget downloads - sort of requires random URL instead valid file name?
 -- custom 404 ?
 
 - tests - increate test coverage

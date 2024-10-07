@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/ports"
+	"gorm.io/gorm"
 )
 
 type ArtifactRepository struct {
@@ -40,12 +41,22 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 }
 
 func (r *ArtifactRepository) Create(model *models.Artifact) error {
-	if model.CreatedAt == 0 {
-		model.CreatedAt = time.Now().UTC().Unix()
-	}
-	if err := model.Validate(); err != nil {
-		return fmt.Errorf("invalid repo object: %w", err)
-	}
-	err := r.db.Create(model).Error
+	err := r.db.Transaction(func(db *gorm.DB) error {
+		if model.CreatedAt == 0 {
+			model.CreatedAt = time.Now().UTC().Unix()
+		}
+		if err := model.Validate(); err != nil {
+			return fmt.Errorf("invalid repo object: %w", err)
+		}
+
+		// Create artifact model
+		if err := db.Create(model).Error; err != nil {
+			return err
+		}
+
+		// Modify the Repo.Size
+		err := db.Model(&models.Repo{}).Where("id = ?", model.RepoID).Update("size", gorm.Expr("size + ?", model.Size)).Error
+		return err
+	})
 	return err
 }
