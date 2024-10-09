@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
@@ -19,7 +20,7 @@ func startup(log ports.Logger, config *config.Config, bus ports.EventBus, repoRe
 		// Create repo model in repository
 		if err := repoRepository.Create(&repo); err != nil {
 			log.Error("unable create repo record", slog.Any("err", err))
-			return lib.NewErrorCode(err, retCreateRepoRecordError)
+			return lib.NewErrorCode(err, errors.RetCreateRepoRecordError)
 		}
 		// Emit event on repo model updated and input updated
 		bus.Pub(ports.TopicRepoUpdated, ports.Event{repo.ID})

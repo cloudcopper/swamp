@@ -1,49 +1,41 @@
-package swamp
+package main
 
 import (
-	"embed"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/adapters/http"
 	"github.com/cloudcopper/swamp/adapters/http/controllers"
 	"github.com/cloudcopper/swamp/adapters/repository"
+	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
-	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 )
 
-// App execute application and returns error, when complete by ctrl-c.
-// The application reads config(s), templates and static web files
-// from layered filesystem.
-// Layered filesystem consists of next layers:
-//   - ./ of ${SWAMP_ROOT} (optional)
-//   - ./ of current working directory
-//   - embed.fs given as parameter (cmdFS)
-//   - package own embed.fs (appFS)
-func App(log ports.Logger, cmdFS embed.FS) error {
-	// EventBus
-	var bus ports.EventBus = infra.NewEventBus()
-	defer bus.Shutdown()
+var numRepos = []int{1, 20}
+var numArtifacts = []int{30, 600}
+
+func main() {
+	log := slog.Default()
+	err := app(log)
+	_ = err
+}
+
+// Massive copy paste from app.go
+func app(log *slog.Logger) error {
+	// Force development environment
+	os.Setenv("GO_ENV", "development")
 
 	// Create layered filesystem
-	fs, err := infra.NewLayerFileSystem(config.TopRootFileSystemPath, os.Getwd, cmdFS, appFS)
+	fs, err := infra.NewLayerFileSystem(os.Getwd)
 	if err != nil {
 		log.Error("unable to create layered filesystem!!!", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetLayerFilesystemError)
-	}
-
-	// Load configuration
-	config, err := config.LoadConfig(log, fs)
-	if err != nil {
-		log.Error("unable to load config!!!", slog.Any("err", err))
-		return lib.NewErrorCode(err, errors.RetLoadConfigError)
 	}
 
 	// Open database
@@ -73,35 +65,8 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	}
 	repositories := repository.NewRepositories(repoRepository, artifactRepository)
 
-	// Create artifact storage
-	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, db)
-	if err != nil {
-		log.Error("unable to create artifact storage", slog.Any("err", err))
-		return lib.NewErrorCode(err, errors.RetCreateArtifactStorageError)
-	}
-	defer artifactStorage.Close()
-	// Create artifacts service:
-	// - create artifacts by new checksum files
-	// - checking artifacts in storage
-	artifactService, err := NewArtifactService(log, bus, artifactStorage, repositories)
-	if err != nil {
-		log.Error("unable to create artifact service", slog.Any("err", err))
-		return lib.NewErrorCode(err, errors.RetCreateChecksumServiceError)
-	}
-	defer artifactService.Close()
-	// Create repo service
-	repoService := NewRepoService(log, bus, infra.NewFilepathWalk(), repositories)
-	defer repoService.Close()
-	// Create filesystem watcher for input files
-	inputWatcher, err := infra.NewWatcherService("input", log, bus)
-	if err != nil {
-		log.Error("unable to create new watcher service", slog.Any("err", err))
-		return lib.NewErrorCode(err, errors.RetCreateInputWatcherError)
-	}
-	defer inputWatcher.Close()
-
 	// Perform neccesery startup operations
-	if err := startup(log, config, bus, repoRepository); err != nil {
+	if err := startup(log, repositories); err != nil {
 		return err
 	}
 
@@ -142,9 +107,11 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 
 	// Close http server
 	httpServer.Close()
+	return nil
+}
 
-	// Close watcher by ctrl-c
-	inputWatcher.Close()
-	// TODO Optionally dump whole db to debug file ?
+// Prefill database with random data
+func startup(log ports.Logger, repos domain.Repositories) error {
+
 	return nil
 }
