@@ -104,8 +104,8 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(repo *models.Repo, id models.A
 	return id, size, createdAt, nil
 }
 
-func (s *BasicArtifactStorageAdapter) GetArtifactFiles(models.RepoID, models.ArtifactID) ([]*models.File, error) {
-	files := []*models.File{}
+func (s *BasicArtifactStorageAdapter) GetArtifactFiles(models.RepoID, models.ArtifactID) (models.ArtifactFiles, error) {
+	files := models.ArtifactFiles{}
 	s.log.Error("GetArtifactFiles not implemented!!!")
 	return files, nil
 }

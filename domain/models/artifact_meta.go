@@ -2,6 +2,8 @@ package models
 
 import "github.com/cloudcopper/swamp/lib"
 
+type ArtifactMetas []*ArtifactMeta
+
 type ArtifactMeta struct {
 	RepoID     RepoID     `gorm:"primaryKey;not null" validate:"required,validid"`
 	ArtifactID ArtifactID `gorm:"primaryKey;not null" validate:"required,validid"`

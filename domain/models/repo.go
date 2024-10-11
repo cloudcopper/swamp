@@ -20,7 +20,7 @@ type Repo struct {
 	Broken      string         `gorm:"string" validate:"omitempty,min=3,eq=/dev/null|dir,abspath,nefield=Input,nefield=Storage"`
 	Size        types.Size     `gorm:"int64" validate:"min=0"`
 	Meta        RepoMetas      `gorm:"foreignKey:RepoID" validate:"-"`
-	Artifacts   []*Artifact    `gorm:"foreignKey:RepoID" yaml:"-" validate:"-"`
+	Artifacts   Artifacts      `gorm:"foreignKey:RepoID" yaml:"-" validate:"-"`
 }
 
 func (model *Repo) Validate() error {

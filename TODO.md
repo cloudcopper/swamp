@@ -2,7 +2,7 @@ TODO
 ====
 - retention/artifacts checks functionality
 -- starts 30 minutes after app startup
--- periodic, evenly distributed or with minimal interval (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
+-- periodic with arbitrary interval or evenly distributed (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
 -- artifacts should be first marked as exipred (Artifact.State field)
 -- mark artifact broken (Artifact.State field)
 -- if repo has no Repo.Broken defined then artifacts presents all the time

@@ -11,6 +11,8 @@ type ArtifactID = string
 
 const EmptyArtifactID = ArtifactID("")
 
+type Artifacts []*Artifact
+
 type Artifact struct {
 	RepoID    RepoID           `gorm:"primaryKey;not null" validate:"required,validid"`
 	ID        ArtifactID       `gorm:"primaryKey;not null" validate:"required,validid"`
@@ -18,8 +20,8 @@ type Artifact struct {
 	State     vo.ArtifactState `gorm:"int" validate:"min=0,max=3"`
 	CreatedAt int64            `gorm:"index;column:created_at" validate:"required,gt=0"` // UTC Unix time of creation - equal to ```date +%s```
 	Checksum  string           `gorm:"not null" validate:"required,min=8"`
-	Meta      []*ArtifactMeta  `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
-	Files     []*File          `gorm:"-" valudate:"-"`
+	Meta      ArtifactMetas    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
+	Files     ArtifactFiles    `gorm:"-" valudate:"-"`
 }
 
 func (model *Artifact) Validate() error {

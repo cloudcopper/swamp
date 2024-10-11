@@ -297,9 +297,13 @@ func genChecksum() string {
 }
 
 func genArtifactID() string {
-	switch R([]string{"semver", "hash", "uuid", "ulid"}) {
+	switch R([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
 	case "hash":
 		return genChecksum()
+	case "short-hash":
+		return genChecksum()[:8]
+	case "dirty":
+		return fmt.Sprintf("v%s-%d-%s-dirty", genSemver(), random([]int{1, 10}), genChecksum()[:8])
 	case "uuid":
 		return uuid.New().String()
 	case "ulid":
@@ -332,10 +336,10 @@ type FakeStorage struct {
 func (*FakeStorage) NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error) {
 	panic("not expected to be called atm!!!")
 }
-func (*FakeStorage) GetArtifactFiles(models.RepoID, models.ArtifactID) ([]*models.File, error) {
-	files := []*models.File{}
+func (*FakeStorage) GetArtifactFiles(models.RepoID, models.ArtifactID) (models.ArtifactFiles, error) {
+	files := models.ArtifactFiles{}
 	for x := 0; x < random(numFiles); x++ {
-		file := &models.File{
+		file := &models.ArtifactFile{
 			Name:  genFileName(3),
 			Size:  types.Size(random([]int{128, 150000000})),
 			State: vo.ArtifactState(R([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1})),
