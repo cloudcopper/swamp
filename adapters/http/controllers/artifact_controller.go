@@ -15,14 +15,16 @@ type ArtifactController struct {
 	log                ports.Logger
 	render             infra.Render
 	artifactRepository domain.ArtifactRepository
+	aritfactStorage    ports.ArtifactStorage
 }
 
-func NewArtifactController(log ports.Logger, render infra.Render, artifactRepository domain.ArtifactRepository) *ArtifactController {
+func NewArtifactController(log ports.Logger, render infra.Render, artifactRepository domain.ArtifactRepository, aritfactStorage ports.ArtifactStorage) *ArtifactController {
 	log = log.With(slog.String("entity", "ArtifactController"))
 	s := &ArtifactController{
 		log:                log,
 		render:             render,
 		artifactRepository: artifactRepository,
+		aritfactStorage:    aritfactStorage,
 	}
 	return s
 }
@@ -55,10 +57,20 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	artifactID := chi.URLParam(r, "artifactID")
 
 	errors := []string{}
+
 	artifact, err := c.artifactRepository.FindByID(repoID, artifactID, ports.WithRelationship(true))
+	// TODO What to do if errors.Is(err, gorm.ErrRecordNotFound)??? 404???
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
+	// NOTE The files are not in database atm!!!
+	// Should we store those in database?
+	// That would be caching and additional validation for tampering?
+	files, err := c.aritfactStorage.GetArtifactFiles(repoID, artifactID)
+	if err != nil {
+		errors = append(errors, err.Error())
+	}
+	artifact.Files = files
 
 	data := struct {
 		Errors   []string

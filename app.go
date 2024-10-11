@@ -113,7 +113,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	// Create controllers
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
-	artifactController := controllers.NewArtifactController(log, render, artifactRepository)
+	artifactController := controllers.NewArtifactController(log, render, artifactRepository, artifactStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)

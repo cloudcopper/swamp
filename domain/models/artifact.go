@@ -19,6 +19,7 @@ type Artifact struct {
 	CreatedAt int64            `gorm:"index;column:created_at" validate:"required,gt=0"` // UTC Unix time of creation - equal to ```date +%s```
 	Checksum  string           `gorm:"not null" validate:"required,min=8"`
 	Meta      []*ArtifactMeta  `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
+	Files     []*File          `gorm:"-" valudate:"-"`
 }
 
 func (model *Artifact) Validate() error {

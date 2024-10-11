@@ -76,7 +76,7 @@ func (r *RepoRepository) FindByID(id models.RepoID, flags ...interface{}) (*mode
 		}
 	}
 
-	err := db.Find(&repo, models.Repo{ID: id}).Error
+	err := db.First(&repo, models.Repo{ID: id}).Error
 	return repo, err
 }
 

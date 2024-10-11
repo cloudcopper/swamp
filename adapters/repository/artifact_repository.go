@@ -48,7 +48,7 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 		}
 	}
 
-	err := db.Find(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
+	err := db.First(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
 	return artifact, err
 }
 

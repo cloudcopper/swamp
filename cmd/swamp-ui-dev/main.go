@@ -75,6 +75,7 @@ var (
 	numRepoMetaValueTexts = []int{1, 4}
 
 	numArtifacts = []int{30, 600}
+	numFiles     = []int{1, 30}
 )
 
 func main() {
@@ -135,7 +136,7 @@ func app(log *slog.Logger) error {
 	// Create controllers
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
-	artifactController := controllers.NewArtifactController(log, render, artifactRepository)
+	artifactController := controllers.NewArtifactController(log, render, artifactRepository, fakeStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
@@ -323,3 +324,34 @@ func genSemver() string {
 }
 
 var gen = loremipsum.New()
+var fakeStorage = &FakeStorage{}
+
+type FakeStorage struct {
+}
+
+func (*FakeStorage) NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error) {
+	panic("not expected to be called atm!!!")
+}
+func (*FakeStorage) GetArtifactFiles(models.RepoID, models.ArtifactID) ([]*models.File, error) {
+	files := []*models.File{}
+	for x := 0; x < random(numFiles); x++ {
+		file := &models.File{
+			Name:  genFileName(3),
+			Size:  types.Size(random([]int{128, 150000000})),
+			State: vo.ArtifactState(R([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1})),
+		}
+		files = append(files, file)
+	}
+
+	return files, nil
+}
+
+func genFileName(n int) string {
+	a := []string{}
+	for x := 0; x < random([]int{1, n}); x++ {
+		a = append(a, strings.ReplaceAll(genWords([]int{1, 3}), " ", "_"))
+	}
+
+	file := strings.Join(a, string(filepath.Separator)) + "." + R([]string{"bin", "txt", "srec", "jar", "tar.gz", "html", "iso"})
+	return file
+}

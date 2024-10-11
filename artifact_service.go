@@ -179,7 +179,6 @@ func (s *ArtifactService) background() {
 
 // The checkRepoArtifact checks the artifact inside repo storage.
 // If it dangling, it creates new artifact model.
-// TODO If it broken, signal its broken
 func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID models.ArtifactID) {
 	log := s.log.With(slog.Any("repoID", repoID), slog.Any("artifactID", artifactID))
 	repo, err := s.repositories.Repo().FindByID(repoID)

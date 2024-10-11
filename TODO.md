@@ -14,7 +14,6 @@ TODO
 
 - meta for artifacts. use similar to the checksum algo way???
 -- with blacklist for some variables - i.e *PASSWORD* value should be *************
--- meta is many to many?
 -- with url support (to have i.e. back links)
 
 - artifacts download as separate file or aggregate (.zip)
@@ -33,7 +32,6 @@ CUSTOM.md - how to customize
 -- custom 404 ?
 
 - tests - increate test coverage
-- test - pagination seems fails on empty input data
 
 - access log
 - input web (the way to put over http new artifacts)
