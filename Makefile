@@ -1,9 +1,10 @@
 .PHONY:all
 all: swamp
 
-SRC = $(shell find . -path '*.go')
+SRC = $(shell find . -path '*.go' -or -path '*.html')
 swamp: ${SRC}
 	CGO_ENABLED=0 go build -ldflags="-s -w" ./cmd/swamp
+	CGO_ENABLED=0 go build -ldflags="-s -w" ./cmd/swamp-ui-dev
 
 .PHONY:test
 test:

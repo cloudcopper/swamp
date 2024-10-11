@@ -3,8 +3,8 @@ package domain
 import "github.com/cloudcopper/swamp/domain/models"
 
 type ArtifactRepository interface {
-	IterateAll(func(*models.Artifact) (bool, error)) error
+	Create(model *models.Artifact) error
 	FindAll() ([]*models.Artifact, error)
-	FindByID(models.RepoID, models.ArtifactID) (*models.Artifact, error)
-	Create(*models.Artifact) error
+	FindByID(repoID models.RepoID, artifactID models.ArtifactID, flags ...interface{}) (*models.Artifact, error)
+	IterateAll(func(*models.Artifact) (bool, error)) error
 }

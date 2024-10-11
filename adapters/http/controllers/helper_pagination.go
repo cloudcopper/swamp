@@ -10,11 +10,16 @@ func helperPagination[T any](r *http.Request, data []T, perPage int) ([]T, int) 
 	if r.URL.Query().Get("page") != "" {
 		page, _ = strconv.Atoi(r.URL.Query().Get("page"))
 	}
-	total := len(data)
-	pages := (total + perPage - 1) / perPage
 	if page < 1 {
 		page = 1
-	} else if page > pages {
+	}
+
+	total := len(data)
+	pages := (total + perPage - 1) / perPage
+	if pages < 1 {
+		return data, 1
+	}
+	if page > pages {
 		page = pages
 	}
 	start := (page - 1) * perPage

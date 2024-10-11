@@ -55,7 +55,7 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	artifactID := chi.URLParam(r, "artifactID")
 
 	errors := []string{}
-	artifact, err := c.artifactRepository.FindByID(repoID, artifactID)
+	artifact, err := c.artifactRepository.FindByID(repoID, artifactID, ports.WithRelationship(true))
 	if err != nil {
 		errors = append(errors, err.Error())
 	}

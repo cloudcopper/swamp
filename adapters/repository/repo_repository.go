@@ -22,10 +22,11 @@ func NewRepoRepository(db ports.DB) (*RepoRepository, error) {
 }
 
 func (r *RepoRepository) Create(model *models.Repo) error {
-	if err := model.Validate(); err != nil {
-		return fmt.Errorf("invalid repo object: %w", err)
-	}
 	err := r.db.Transaction(func(db *gorm.DB) error {
+		if err := model.Validate(); err != nil {
+			return fmt.Errorf("invalid repo object: %w", err)
+		}
+
 		if err := db.Create(model).Error; err != nil {
 			return fmt.Errorf("unable to save repo object: %w", err)
 		}

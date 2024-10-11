@@ -1,6 +1,8 @@
 module github.com/cloudcopper/swamp
 
-go 1.21
+go 1.22.0
+
+toolchain go1.22.8
 
 require (
 	github.com/charlievieth/fastwalk v1.0.8
@@ -9,13 +11,16 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fsnotify/fsnotify v1.7.1-0.20240516151259-c1467c02fba5
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-loremipsum/loremipsum v1.1.3
 	github.com/go-playground/validator/v10 v10.22.1
+	github.com/google/uuid v1.6.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/phsym/console-slog v0.3.1
 	github.com/samber/slog-chi v1.11.1
 	github.com/stretchr/testify v1.9.0
 	github.com/unrolled/render v1.6.1
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.12
@@ -27,7 +32,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

@@ -33,9 +33,21 @@ func (r *ArtifactRepository) FindAll() ([]*models.Artifact, error) {
 	return artifacts, err
 }
 
-func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.ArtifactID) (*models.Artifact, error) {
+func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.ArtifactID, flags ...interface{}) (*models.Artifact, error) {
 	var artifact *models.Artifact
 	db := r.db
+
+	for _, flag := range flags {
+		switch v := flag.(type) {
+		case ports.WithRelationship:
+			if v {
+				db = db.Preload("Meta", func(db ports.DB) ports.DB {
+					return db.Order("key DESC")
+				})
+			}
+		}
+	}
+
 	err := db.Find(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
 	return artifact, err
 }
@@ -46,7 +58,7 @@ func (r *ArtifactRepository) Create(model *models.Artifact) error {
 			model.CreatedAt = time.Now().UTC().Unix()
 		}
 		if err := model.Validate(); err != nil {
-			return fmt.Errorf("invalid repo object: %w", err)
+			return fmt.Errorf("invalid artifact object: %w", err)
 		}
 
 		// Create artifact model
