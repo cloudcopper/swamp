@@ -1,4 +1,4 @@
-package infra
+package disk
 
 import (
 	"io/fs"

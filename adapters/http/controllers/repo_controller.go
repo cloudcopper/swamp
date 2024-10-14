@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
-	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/go-chi/chi/v5"
@@ -38,10 +38,10 @@ func (c *RepoController) Get(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		Errors []string
-		Repo   *models.Repo
+		Repo   *viewmodels.Repo
 	}{
 		Errors: errors,
-		Repo:   repo,
+		Repo:   viewmodels.NewRepo(repo),
 	}
 
 	c.render.HTML(w, http.StatusOK, "repo", data)

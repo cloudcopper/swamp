@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
@@ -47,12 +48,12 @@ func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		Errors        []string
-		Repos         []*models.Repo
+		Repos         []*viewmodels.Repo
 		Artifacts     []*models.Artifact
 		ArtifactsPage int
 	}{
 		Errors:        errors,
-		Repos:         repos,
+		Repos:         viewmodels.NewRepos(repos),
 		Artifacts:     artifacts,
 		ArtifactsPage: artifactsPage,
 	}

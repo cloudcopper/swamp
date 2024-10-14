@@ -1,12 +1,15 @@
 TODO
 ====
-- retention/artifacts checks functionality
+- retention
+-- starts 30 minutes after app startup
+-- artifacts should be first marked as exipred (Artifact.State field)
+-- expired artifacts deleted on second round
+
+- artifacts checks functionality
 -- starts 30 minutes after app startup
 -- periodic with arbitrary interval or evenly distributed (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
--- artifacts should be first marked as exipred (Artifact.State field)
 -- mark artifact broken (Artifact.State field)
 -- if repo has no Repo.Broken defined then artifacts presents all the time
--- expired artifacts deleted on second cicle
 -- broken artifacts suppose to be moved on second cicle
 -- broken as /dev/null means to be deleted
 -- Handle manual artifact removal from artifact storage
@@ -37,3 +40,5 @@ CUSTOM.md - how to customize
 - input web (the way to put over http new artifacts)
 - abstract out storage
 -- currently it is filesystem but may it be more flexible? minio?
+
+- gorm -> goent ???

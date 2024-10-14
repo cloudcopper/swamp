@@ -1,0 +1,40 @@
+package viewmodels
+
+import (
+	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/lib/types"
+)
+
+type Repo struct {
+	ID          models.RepoID
+	Name        string
+	Description string
+	Retention   types.Duration
+	Size        types.Size
+	Meta        models.RepoMetas
+	Artifacts   []*Artifact
+}
+
+func NewRepo(repo *models.Repo) *Repo {
+	r := &Repo{
+		ID:          repo.ID,
+		Name:        repo.Name,
+		Description: repo.Description,
+		Retention:   repo.Retention,
+		Size:        repo.Size,
+		Meta:        repo.Meta,
+	}
+
+	for _, a := range repo.Artifacts {
+		r.Artifacts = append(r.Artifacts, NewArtifact(a))
+	}
+	return r
+}
+
+func NewRepos(repos []*models.Repo) []*Repo {
+	a := []*Repo{}
+	for _, r := range repos {
+		a = append(a, NewRepo(r))
+	}
+	return a
+}

@@ -13,12 +13,12 @@ import (
 )
 
 type WatcherService struct {
-	id             string
-	log            ports.Logger
-	bus            ports.EventBus
-	chInputUpdated chan ports.Event
-	watcher        *fsnotify.Watcher
-	closeWg        sync.WaitGroup
+	id                  string
+	log                 ports.Logger
+	bus                 ports.EventBus
+	chTopicInputUpdated chan ports.Event
+	watcher             *fsnotify.Watcher
+	closeWg             sync.WaitGroup
 }
 
 func NewWatcherService(id string, log ports.Logger, bus ports.EventBus) (*WatcherService, error) {
@@ -29,11 +29,11 @@ func NewWatcherService(id string, log ports.Logger, bus ports.EventBus) (*Watche
 	}
 
 	s := &WatcherService{
-		id:             id,
-		log:            log,
-		bus:            bus,
-		chInputUpdated: bus.Sub(ports.TopicInputUpdated),
-		watcher:        watcher,
+		id:                  id,
+		log:                 log,
+		bus:                 bus,
+		chTopicInputUpdated: bus.Sub(ports.TopicInputUpdated),
+		watcher:             watcher,
 	}
 	log.Info("created")
 
@@ -57,7 +57,7 @@ func (s *WatcherService) Close() {
 	}
 
 	s.log.Info("closing")
-	s.bus.Unsub(s.chInputUpdated)
+	s.bus.Unsub(s.chTopicInputUpdated)
 	s.watcher.Close()
 	s.closeWg.Wait()
 	s.watcher = nil
@@ -88,7 +88,7 @@ func (s *WatcherService) background() {
 	topicFileRemoved := fmt.Sprintf("%v-file-removed", s.id)
 	for {
 		select {
-		case event, ok := <-s.chInputUpdated:
+		case event, ok := <-s.chTopicInputUpdated:
 			log.Debug("watcher event", slog.Any("event", event))
 			if !ok {
 				return

@@ -5,6 +5,6 @@ import (
 )
 
 type ArtifactStorage interface {
-	NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error)
-	GetArtifactFiles(models.RepoID, models.ArtifactID) (models.ArtifactFiles, error)
+	NewArtifact(input string, storage string, artifactID models.ArtifactID, artifacts []string) (models.ArtifactID, int64, int64, error)
+	GetArtifactFiles(storage string, artifactID models.ArtifactID) (models.ArtifactFiles, error)
 }

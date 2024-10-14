@@ -231,12 +231,20 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 				meta = append(meta, m)
 			}
 
+			createdAt := int64(random([]int{0, int(time.Now().UTC().Unix())}))
+			expiredAt := createdAt + int64(repo.Retention/1000000000)
+			state := vo.ArtifactState(random([]int{0, 3}))
+			if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
+				state |= vo.ArtifactIsExpired
+			}
 			artifact := &models.Artifact{
 				RepoID:    repoID,
 				ID:        artifactID,
+				Storage:   repo.Storage,
 				Size:      types.Size(random([]int{1024, 150 * 1024 * 1024})),
-				State:     vo.ArtifactState(random([]int{0, 3})),
-				CreatedAt: int64(random([]int{0, int(time.Now().UTC().Unix())})),
+				State:     state,
+				CreatedAt: createdAt,
+				ExpiredAt: expiredAt,
 				Checksum:  genChecksum(),
 				Meta:      meta,
 			}
@@ -299,7 +307,7 @@ func genChecksum() string {
 func genArtifactID() string {
 	switch R([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
 	case "hash":
-		return genChecksum()
+		return genChecksum()[:64]
 	case "short-hash":
 		return genChecksum()[:8]
 	case "dirty":
@@ -333,10 +341,10 @@ var fakeStorage = &FakeStorage{}
 type FakeStorage struct {
 }
 
-func (*FakeStorage) NewArtifact(*models.Repo, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error) {
+func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error) {
 	panic("not expected to be called atm!!!")
 }
-func (*FakeStorage) GetArtifactFiles(models.RepoID, models.ArtifactID) (models.ArtifactFiles, error) {
+func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.ArtifactFiles, error) {
 	files := models.ArtifactFiles{}
 	for x := 0; x < random(numFiles); x++ {
 		file := &models.ArtifactFile{

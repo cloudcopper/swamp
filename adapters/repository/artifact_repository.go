@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/ports"
@@ -54,9 +53,11 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 
 func (r *ArtifactRepository) Create(model *models.Artifact) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
-		if model.CreatedAt == 0 {
-			model.CreatedAt = time.Now().UTC().Unix()
-		}
+		/*
+			if model.CreatedAt == 0 {
+				model.CreatedAt = time.Now().UTC().Unix()
+			}
+		*/
 		if err := model.Validate(); err != nil {
 			return fmt.Errorf("invalid artifact object: %w", err)
 		}

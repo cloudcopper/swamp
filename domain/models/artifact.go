@@ -16,9 +16,11 @@ type Artifacts []*Artifact
 type Artifact struct {
 	RepoID    RepoID           `gorm:"primaryKey;not null" validate:"required,validid"`
 	ID        ArtifactID       `gorm:"primaryKey;not null" validate:"required,validid"`
+	Storage   string           `gorm:"not null" validate:"required,min=3,dir,abspath"`
 	Size      types.Size       `gorm:"not null" validate:"required,gt=0"`
 	State     vo.ArtifactState `gorm:"int" validate:"min=0,max=3"`
 	CreatedAt int64            `gorm:"index;column:created_at" validate:"required,gt=0"` // UTC Unix time of creation - equal to ```date +%s```
+	ExpiredAt int64            `gorm:"index;column:expired_at" validate:"required,gt=0"` // UTC Unix time at which the artifacts expires
 	Checksum  string           `gorm:"not null" validate:"required,min=8"`
 	Meta      ArtifactMetas    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
 	Files     ArtifactFiles    `gorm:"-" valudate:"-"`
@@ -41,4 +43,13 @@ func (model *Artifact) Validate() error {
 	}
 
 	return nil
+}
+
+func (a Artifacts) HasArtifactID(id ArtifactID) bool {
+	for _, artifact := range a {
+		if artifact.ID == id {
+			return true
+		}
+	}
+	return false
 }

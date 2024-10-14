@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
@@ -66,7 +67,7 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	// NOTE The files are not in database atm!!!
 	// Should we store those in database?
 	// That would be caching and additional validation for tampering?
-	files, err := c.aritfactStorage.GetArtifactFiles(repoID, artifactID)
+	files, err := c.aritfactStorage.GetArtifactFiles(artifact.Storage, artifactID)
 	if err != nil {
 		errors = append(errors, err.Error())
 	}
@@ -74,10 +75,10 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 
 	data := struct {
 		Errors   []string
-		Artifact *models.Artifact
+		Artifact *viewmodels.Artifact
 	}{
 		Errors:   errors,
-		Artifact: artifact,
+		Artifact: viewmodels.NewArtifact(artifact),
 	}
 
 	c.render.HTML(w, http.StatusOK, "artifact", data)

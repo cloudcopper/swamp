@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cloudcopper/swamp/lib"
@@ -20,3 +21,5 @@ type ErrArtifactAlreadyExists struct {
 func (e ErrArtifactAlreadyExists) Error() string {
 	return fmt.Sprintf("artifact already exists %v", e.Path)
 }
+
+var Is = errors.Is

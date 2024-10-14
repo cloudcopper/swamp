@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
-	"github.com/cloudcopper/swamp/infra"
+	"github.com/cloudcopper/swamp/infra/disk"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
@@ -25,14 +26,14 @@ import (
 //   - input-file-modified - to check if the file is checksum belonging to any of known repos,
 //     and if so, then create new artifact by checksum file
 type ArtifactService struct {
-	log                    ports.Logger
-	bus                    ports.EventBus
-	artifactStorage        ports.ArtifactStorage
-	repositories           domain.Repositories
-	chRepoUpdated          chan ports.Event
-	chFileModified         chan ports.Event
-	chDanglingRepoArtifact chan ports.Event
-	closeWg                sync.WaitGroup
+	log                         ports.Logger
+	bus                         ports.EventBus
+	artifactStorage             ports.ArtifactStorage
+	repositories                domain.Repositories
+	chTopicRepoUpdated          chan ports.Event
+	chTopicInputFileModified    chan ports.Event
+	chTopicDanglingRepoArtifact chan ports.Event
+	closeWg                     sync.WaitGroup
 }
 
 func NewArtifactService(log ports.Logger, bus ports.EventBus, artifactStorage ports.ArtifactStorage, repositories domain.Repositories) (*ArtifactService, error) {
@@ -43,13 +44,13 @@ func NewArtifactService(log ports.Logger, bus ports.EventBus, artifactStorage po
 	}
 
 	s := &ArtifactService{
-		log:                    log,
-		bus:                    bus,
-		artifactStorage:        artifactStorage,
-		repositories:           repositories,
-		chRepoUpdated:          bus.Sub(ports.TopicRepoUpdated),
-		chFileModified:         bus.Sub(ports.TopicInputFileModified),
-		chDanglingRepoArtifact: bus.Sub(ports.TopicDanglingRepoArtifact),
+		log:                         log,
+		bus:                         bus,
+		artifactStorage:             artifactStorage,
+		repositories:                repositories,
+		chTopicRepoUpdated:          bus.Sub(ports.TopicRepoUpdated),
+		chTopicInputFileModified:    bus.Sub(ports.TopicInputFileModified),
+		chTopicDanglingRepoArtifact: bus.Sub(ports.TopicDanglingRepoArtifact),
 	}
 	log.Info("created")
 
@@ -66,9 +67,9 @@ func NewArtifactService(log ports.Logger, bus ports.EventBus, artifactStorage po
 
 func (s *ArtifactService) Close() {
 	s.log.Info("closing")
-	s.bus.Unsub(s.chDanglingRepoArtifact)
-	s.bus.Unsub(s.chFileModified)
-	s.bus.Unsub(s.chRepoUpdated)
+	s.bus.Unsub(s.chTopicDanglingRepoArtifact)
+	s.bus.Unsub(s.chTopicInputFileModified)
+	s.bus.Unsub(s.chTopicRepoUpdated)
 	s.closeWg.Wait()
 }
 
@@ -84,7 +85,7 @@ func (s *ArtifactService) background() {
 
 	for {
 		select {
-		case _, ok := <-s.chRepoUpdated:
+		case _, ok := <-s.chTopicRepoUpdated:
 			if !ok {
 				return
 			}
@@ -94,7 +95,7 @@ func (s *ArtifactService) background() {
 				return
 			}
 
-		case event, ok := <-s.chFileModified:
+		case event, ok := <-s.chTopicInputFileModified:
 			if !ok {
 				return
 			}
@@ -124,7 +125,7 @@ func (s *ArtifactService) background() {
 				// Create new artifacts
 				artifacts := append(goodFiles, path)
 				id := lib.GetFirstSubdir(repo.Input, path)
-				artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo, id, artifacts)
+				artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
 				if err != nil {
 					log.Error("unable to create new artifacts", slog.Any("err", err))
 				}
@@ -153,12 +154,18 @@ func (s *ArtifactService) background() {
 				}
 
 				// Insert artifact record
+				expiredAt := createdAt + int64(repo.Retention/1000000000)
+				state := vo.ArtifactIsOK
+				if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
+					state |= vo.ArtifactIsExpired
+				}
 				artifact := &models.Artifact{
 					ID:        artifactID,
 					RepoID:    repo.ID,
 					Size:      types.Size(size),
-					State:     vo.ArtifactIsOK,
+					State:     state,
 					CreatedAt: createdAt,
+					ExpiredAt: expiredAt,
 					Checksum:  checksum,
 				}
 				if err := s.repositories.Artifact().Create(artifact); err != nil {
@@ -167,7 +174,7 @@ func (s *ArtifactService) background() {
 
 				break
 			}
-		case event, ok := <-s.chDanglingRepoArtifact:
+		case event, ok := <-s.chTopicDanglingRepoArtifact:
 			if !ok {
 				return
 			}
@@ -196,17 +203,25 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 
 	artifact, err := s.repositories.Artifact().FindByID(repoID, artifactID)
-	if err != nil {
+	if err != nil && !errors.Is(err, ports.ErrRecordNotFound) {
 		log.Error("unable to find artifact", slog.Any("err", err))
 		return
 	}
 	if artifact.ID == models.EmptyArtifactID {
 		log.Info("dangling artifact")
+		expiredAt := createdAt + int64(repo.Retention/1000000000)
+		state := vo.ArtifactIsOK
+		if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
+			state |= vo.ArtifactIsExpired
+		}
 		artifact.ID = artifactID
 		artifact.RepoID = repoID
+		artifact.Storage = repo.Storage
 		artifact.Size = types.Size(size)
 		artifact.Checksum = checksum
+		artifact.State = state
 		artifact.CreatedAt = createdAt
+		artifact.ExpiredAt = expiredAt
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
 			log.Error("unable create artifact record", slog.Any("err", err))
 			return
@@ -239,7 +254,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string, error) {
 	checksumFile, files := "", []string{}
 
-	w := infra.NewFilepathWalk()
+	w := disk.NewFilepathWalk()
 	w.Walk(location, func(name string, err error) (bool, error) {
 		if err != nil {
 			s.log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))

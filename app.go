@@ -15,6 +15,7 @@ import (
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/infra/config"
+	"github.com/cloudcopper/swamp/infra/disk"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 )
@@ -74,7 +75,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	repositories := repository.NewRepositories(repoRepository, artifactRepository)
 
 	// Create artifact storage
-	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, db)
+	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log)
 	if err != nil {
 		log.Error("unable to create artifact storage", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateArtifactStorageError)
@@ -90,7 +91,9 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	}
 	defer artifactService.Close()
 	// Create repo service
-	repoService := NewRepoService(log, bus, infra.NewFilepathWalk(), repositories)
+	// - signal dangling artifacts at startup/repo update
+	// - handling artifacts retention
+	repoService := NewRepoService(log, bus, disk.NewFilepathWalk(), repoRepository)
 	defer repoService.Close()
 	// Create filesystem watcher for input files
 	inputWatcher, err := infra.NewWatcherService("input", log, bus)
