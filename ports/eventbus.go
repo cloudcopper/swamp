@@ -11,6 +11,7 @@ type EventBus interface {
 
 const (
 	TopicRepoUpdated          Topic = "repo-updated"
+	TopicArtifactUpdated      Topic = "artifact-updated"
 	TopicInputUpdated         Topic = "input-updated"
 	TopicInputFileModified    Topic = "input-file-modified"
 	TopicDanglingRepoArtifact Topic = "dangling-repo-artifact"

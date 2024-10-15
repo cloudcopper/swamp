@@ -1,10 +1,5 @@
 TODO
 ====
-- retention
--- starts 30 minutes after app startup
--- artifacts should be first marked as exipred (Artifact.State field)
--- expired artifacts deleted on second round
-
 - artifacts checks functionality
 -- starts 30 minutes after app startup
 -- periodic with arbitrary interval or evenly distributed (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
@@ -13,7 +8,6 @@ TODO
 -- broken artifacts suppose to be moved on second cicle
 -- broken as /dev/null means to be deleted
 -- Handle manual artifact removal from artifact storage
--- reduce Repo.Size on artifact removal
 
 - meta for artifacts. use similar to the checksum algo way???
 -- with blacklist for some variables - i.e *PASSWORD* value should be *************

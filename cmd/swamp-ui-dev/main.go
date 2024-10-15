@@ -236,6 +236,8 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 			state := vo.ArtifactState(random([]int{0, 3}))
 			if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
 				state |= vo.ArtifactIsExpired
+			} else {
+				state &= ^vo.ArtifactIsExpired
 			}
 			artifact := &models.Artifact{
 				RepoID:    repoID,

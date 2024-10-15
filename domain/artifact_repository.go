@@ -4,7 +4,12 @@ import "github.com/cloudcopper/swamp/domain/models"
 
 type ArtifactRepository interface {
 	Create(model *models.Artifact) error
+	Update(model *models.Artifact) error
+	Delete(model *models.Artifact) error
 	FindAll() ([]*models.Artifact, error)
+	FindAllExpired(flags ...interface{}) ([]*models.Artifact, error)
+	FindAllNowExpired() ([]*models.Artifact, error)
+	FindAllNotExpired() ([]*models.Artifact, error)
 	FindByID(repoID models.RepoID, artifactID models.ArtifactID, flags ...interface{}) (*models.Artifact, error)
 	IterateAll(func(*models.Artifact) (bool, error)) error
 }

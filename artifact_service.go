@@ -25,6 +25,7 @@ import (
 //   - repo-updated - to maintain internal list of repos
 //   - input-file-modified - to check if the file is checksum belonging to any of known repos,
 //     and if so, then create new artifact by checksum file
+//   - dangling-repo-artifact - to check/add dangling repo artifact
 type ArtifactService struct {
 	log                         ports.Logger
 	bus                         ports.EventBus
@@ -75,7 +76,6 @@ func (s *ArtifactService) Close() {
 
 func (s *ArtifactService) background() {
 	log := s.log
-	artifactStorage := s.artifactStorage
 
 	repos, err := s.repositories.Repo().FindAll()
 	if err != nil {
@@ -83,9 +83,13 @@ func (s *ArtifactService) background() {
 		return
 	}
 
+	timer := time.NewTimer(30 * time.Minute)
+	defer timer.Stop()
+
 	for {
 		select {
-		case _, ok := <-s.chTopicRepoUpdated:
+		case event, ok := <-s.chTopicRepoUpdated:
+			_ = event
 			if !ok {
 				return
 			}
@@ -94,93 +98,114 @@ func (s *ArtifactService) background() {
 				log.Error("unable to update all repos", slog.Any("err", err))
 				return
 			}
-
 		case event, ok := <-s.chTopicInputFileModified:
 			if !ok {
 				return
 			}
 			path := event[0]
-			log := log.With(slog.String("path", path))
-			log.Debug("detect modified")
-
-			for _, repo := range repos {
-				// Check the path belongs to repo
-				if !strings.HasPrefix(path, repo.Input) {
-					continue
-				}
-				log := log.With(slog.Any("repoID", repo.ID))
-				log.Debug("path match repo")
-
-				// Check the path is a good checksum
-				checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, path)
-				if err == errors.ErrIsNotChecksumFile {
-					continue
-				}
-				if err != nil {
-					log.Error("unable to verify checksum file", slog.Any("goodFiles", goodFiles), slog.Any("badFile", badFiles), slog.Any("err", err))
-					break
-				}
-				log.Info("checksum file verified", slog.Any("goodFiles", goodFiles))
-
-				// Create new artifacts
-				artifacts := append(goodFiles, path)
-				id := lib.GetFirstSubdir(repo.Input, path)
-				artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
-				if err != nil {
-					log.Error("unable to create new artifacts", slog.Any("err", err))
-				}
-				log.Info("new artifact created", slog.String("artifactID", string(artifactID)))
-
-				// Cleanup input artifacts
-				log.Info("cleanup input artifacts")
-				input := repo.Input
-				for i := range artifacts {
-					// clean up in reverse order, so the checksum file is removed first
-					file := artifacts[len(artifacts)-i-1]
-					lib.Assert(strings.HasPrefix(file, input))
-					dir := lib.GetFirstSubdir(input, file)
-					name := filepath.Join(input, dir)
-					if dir == "" {
-						lib.Assert(lib.IsAbs(file))
-						name = file
-					} else {
-						if !lib.IsDirectoryExist(name) {
-							continue
-						}
-					}
-					if err := os.RemoveAll(name); err != nil {
-						log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
-					}
-				}
-
-				// Insert artifact record
-				expiredAt := createdAt + int64(repo.Retention/1000000000)
-				state := vo.ArtifactIsOK
-				if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
-					state |= vo.ArtifactIsExpired
-				}
-				artifact := &models.Artifact{
-					ID:        artifactID,
-					RepoID:    repo.ID,
-					Size:      types.Size(size),
-					State:     state,
-					CreatedAt: createdAt,
-					ExpiredAt: expiredAt,
-					Checksum:  checksum,
-				}
-				if err := s.repositories.Artifact().Create(artifact); err != nil {
-					log.Error("unable insert artifact record", slog.String("artifactID", string(artifactID)), slog.Any("err", err))
-				}
-
-				break
-			}
+			s.checkInputFile(repos, path)
 		case event, ok := <-s.chTopicDanglingRepoArtifact:
 			if !ok {
 				return
 			}
 			repoID, artifactID := event[0], event[1]
 			s.checkRepoArtifact(repoID, artifactID)
+		case _, ok := <-timer.C:
+			if !ok {
+				return
+			}
+			limit := 1
+			// Remove already expired artifacts
+			// and then update expired artifacts.
+			// That allows expired artifact to stay
+			// in db at least one cycle prior being removed.
+			// The limit defines how many expired artifacts
+			// per cycle can be removed.
+			s.removeExpiredArtifacts(limit)
+			s.updateExpiredArtifacts()
+
+			timer.Reset(time.Minute)
 		}
+	}
+
+}
+
+func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
+	log := s.log.With(slog.String("path", path))
+	log.Debug("detect modified")
+
+	artifactStorage := s.artifactStorage
+
+	for _, repo := range repos {
+		// Check the path belongs to repo
+		if !strings.HasPrefix(path, repo.Input) {
+			continue
+		}
+		log := log.With(slog.Any("repoID", repo.ID))
+		log.Debug("path match repo")
+
+		// Check the path is a good checksum
+		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, path)
+		if err == errors.ErrIsNotChecksumFile {
+			continue
+		}
+		if err != nil {
+			log.Error("unable to verify checksum file", slog.Any("goodFiles", goodFiles), slog.Any("badFile", badFiles), slog.Any("err", err))
+			break
+		}
+		log.Info("checksum file verified", slog.Any("goodFiles", goodFiles))
+
+		// Create new artifacts
+		artifacts := append(goodFiles, path)
+		id := lib.GetFirstSubdir(repo.Input, path)
+		artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
+		if err != nil {
+			log.Error("unable to create new artifacts", slog.Any("err", err))
+		}
+		log.Info("new artifact created", slog.String("artifactID", string(artifactID)))
+
+		// Cleanup input artifacts
+		log.Info("cleanup input artifacts")
+		input := repo.Input
+		for i := range artifacts {
+			// clean up in reverse order, so the checksum file is removed first
+			file := artifacts[len(artifacts)-i-1]
+			lib.Assert(strings.HasPrefix(file, input))
+			dir := lib.GetFirstSubdir(input, file)
+			name := filepath.Join(input, dir)
+			if dir == "" {
+				lib.Assert(lib.IsAbs(file))
+				name = file
+			} else {
+				if !lib.IsDirectoryExist(name) {
+					continue
+				}
+			}
+			if err := os.RemoveAll(name); err != nil {
+				log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
+			}
+		}
+
+		// Insert artifact record
+		expiredAt := createdAt + int64(repo.Retention/1000000000)
+		state := vo.ArtifactIsOK
+		if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
+			state |= vo.ArtifactIsExpired
+		}
+		artifact := &models.Artifact{
+			ID:        artifactID,
+			RepoID:    repo.ID,
+			Size:      types.Size(size),
+			State:     state,
+			CreatedAt: createdAt,
+			ExpiredAt: expiredAt,
+			Checksum:  checksum,
+		}
+		if err := s.repositories.Artifact().Create(artifact); err != nil {
+			log.Error("unable create artifact record", slog.String("artifactID", string(artifactID)), slog.Any("err", err))
+		}
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+		return
 	}
 }
 
@@ -227,6 +252,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 			return
 		}
 		log.Info("artifact re-created")
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
 		return
 	}
 	if artifact.ID != artifactID {
@@ -325,4 +351,46 @@ func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string,
 	}
 
 	return size, createdAt, checksum, nil
+}
+
+func (s *ArtifactService) updateExpiredArtifacts() {
+	log := s.log
+	artifacts, err := s.repositories.Artifact().FindAllNowExpired()
+	if err != nil {
+		log.Error("unable fetch all now expired artifacts", slog.Any("err", err))
+		return
+	}
+
+	for _, artifact := range artifacts {
+		lib.Assert(!artifact.State.IsExpired())
+		log.Info("mark artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		artifact.State |= vo.ArtifactIsExpired
+		err := s.repositories.Artifact().Update(artifact)
+		if err != nil {
+			log.Error("unable set artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+		}
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+	}
+}
+
+func (s *ArtifactService) removeExpiredArtifacts(limit int) {
+	log := s.log
+	artifacts, err := s.repositories.Artifact().FindAllExpired(ports.Limit(limit))
+	if err != nil {
+		log.Error("unable fetch all expired artifacts", slog.Any("err", err))
+		return
+	}
+
+	for _, artifact := range artifacts {
+		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log.Info("remove expired artifact")
+		lib.Assert(artifact.State.IsExpired())
+		path := filepath.Join(artifact.Storage, artifact.ID)
+		if err := os.RemoveAll(path); err != nil {
+			log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
+		}
+		if err := s.repositories.Artifact().Delete(artifact); err != nil {
+			log.Error("artifact model delete failed", slog.Any("err", err))
+		}
+	}
 }

@@ -1,6 +1,9 @@
 package models
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/vo"
 	"github.com/cloudcopper/swamp/lib"
@@ -30,6 +33,15 @@ func (model *Artifact) Validate() error {
 	err := lib.Validate.Struct(model)
 	if err != nil {
 		return err
+	}
+
+	// Extra check CreatedAt, ExpiredAt and State.IsExpired()
+	now := time.Now().UTC().Unix()
+	if model.CreatedAt == model.ExpiredAt && model.State.IsExpired() {
+		return fmt.Errorf("artifact has false expired state")
+	}
+	if model.CreatedAt != model.ExpiredAt && model.State.IsExpired() != (model.ExpiredAt < now) {
+		return fmt.Errorf("artifact has wrong expired state")
 	}
 
 	for _, m := range model.Meta {

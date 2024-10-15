@@ -15,6 +15,9 @@ type Artifact struct {
 	ID        models.ArtifactID
 	Size      types.Size
 	State     vo.ArtifactState
+	IsOK      bool
+	IsBroken  bool
+	IsExpired bool
 	CreatedAt time.Time
 	ExpiredAt expiredTime
 	Checksum  string
@@ -42,6 +45,9 @@ func NewArtifact(artifact *models.Artifact) *Artifact {
 		ID:        artifact.ID,
 		Size:      artifact.Size,
 		State:     artifact.State,
+		IsOK:      artifact.State.IsOK(),
+		IsBroken:  artifact.State.IsBroken(),
+		IsExpired: artifact.State.IsExpired(),
 		CreatedAt: time.Unix(artifact.CreatedAt, 0),
 		ExpiredAt: expiredAt,
 		Checksum:  artifact.Checksum,
