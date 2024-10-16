@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	tpl "github.com/cloudcopper/misc/env/template"
 	"github.com/cloudcopper/swamp/domain/models"
@@ -43,6 +44,12 @@ const refRepoID = "${REPO_ID}"
 var (
 	ReposConfigFileName   = "swamp_repos.yml"
 	TopRootFileSystemPath = ""
+	TimerExpiredStart     = 30 * time.Minute
+	TimerExpiredInterval  = 1 * time.Minute
+	TimerExpiredLimit     = 1
+	TimerBrokenStart      = 30 * time.Minute
+	TimerBrokenInterval   = 1 * time.Minute
+	TimerBrokenLimit      = 1
 )
 
 func LoadConfig(log ports.Logger, fs fs.ReadFileFS) (*Config, error) {

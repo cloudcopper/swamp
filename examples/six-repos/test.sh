@@ -28,7 +28,7 @@ done
 #
 # Start swamp in background
 #
-TOP="${TOP}" SWAMP_REPO_CONFIG="${TOP}/six-repos.yml" ${SWAMP} &
+TOP="${TOP}" SWAMP_REPO_CONFIG="${TOP}/six-repos.yml" ${SWAMP} | tee swamp.log &
 SWAMP_PID=$!
 sleep 1
 kill -0 ${SWAMP_PID} || exit 1
@@ -53,10 +53,13 @@ for repoID in ${REPO_IDS}; do
   # In the repo's input directory create the subdirectory with id
   mkdir -p "${INPUT}/${ID}"
 
+  # create fake artifact data files
   dd if=/dev/urandom of="${INPUT}/${ID}/file1.bin" bs=4k count=32
   dd if=/dev/urandom of="${INPUT}/${ID}/file2.bin" bs=4k count=32
   dd if=/dev/urandom of="${INPUT}/${ID}/file3.bin" bs=4k count=32
   dd if=/dev/urandom of="${INPUT}/${ID}/file4.bin" bs=4k count=32
+  # create artifact meta
+  export > ${INPUT}/${ID}/export.txt
   # Create checksum file for artifacts
   # The name of checksum file must be equal to checksum of the file
   (cd ${INPUT}/${ID} && sha256sum * > _tmp.txt && mv _tmp.txt $(sha256sum _tmp.txt|cut -d' ' -f1).sha256sum)

@@ -67,6 +67,7 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	// NOTE The files are not in database atm!!!
 	// Should we store those in database?
 	// That would be caching and additional validation for tampering?
+	// Until that the File.Status is always OK(0)
 	files, err := c.aritfactStorage.GetArtifactFiles(artifact.Storage, artifactID)
 	if err != nil {
 		errors = append(errors, err.Error())

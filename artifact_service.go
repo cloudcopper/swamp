@@ -15,6 +15,7 @@ import (
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
+	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/infra/disk"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
@@ -83,8 +84,12 @@ func (s *ArtifactService) background() {
 		return
 	}
 
-	timer := time.NewTimer(30 * time.Minute)
-	defer timer.Stop()
+	timerExpired := time.NewTimer(config.TimerExpiredStart)
+	defer timerExpired.Stop()
+
+	timerBroken := time.NewTimer(config.TimerBrokenStart)
+	defer timerBroken.Stop()
+	knownArtifacts := []*models.Artifact{}
 
 	for {
 		select {
@@ -110,11 +115,11 @@ func (s *ArtifactService) background() {
 			}
 			repoID, artifactID := event[0], event[1]
 			s.checkRepoArtifact(repoID, artifactID)
-		case _, ok := <-timer.C:
+		case _, ok := <-timerExpired.C:
 			if !ok {
 				return
 			}
-			limit := 1
+			limit := config.TimerExpiredLimit
 			// Remove already expired artifacts
 			// and then update expired artifacts.
 			// That allows expired artifact to stay
@@ -122,12 +127,19 @@ func (s *ArtifactService) background() {
 			// The limit defines how many expired artifacts
 			// per cycle can be removed.
 			s.removeExpiredArtifacts(limit)
-			s.updateExpiredArtifacts()
+			s.markExpiredArtifacts()
 
-			timer.Reset(time.Minute)
+			timerExpired.Reset(config.TimerExpiredInterval)
+		case _, ok := <-timerBroken.C:
+			if !ok {
+				return
+			}
+			limit := config.TimerBrokenLimit
+			s.removeBrokenArtifacts(limit)
+			knownArtifacts = s.checkBrokenArtifacts(limit, knownArtifacts)
+			timerBroken.Reset(config.TimerBrokenInterval)
 		}
 	}
-
 }
 
 func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
@@ -195,6 +207,7 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
 		artifact := &models.Artifact{
 			ID:        artifactID,
 			RepoID:    repo.ID,
+			Storage:   repo.Storage,
 			Size:      types.Size(size),
 			State:     state,
 			CreatedAt: createdAt,
@@ -353,9 +366,9 @@ func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string,
 	return size, createdAt, checksum, nil
 }
 
-func (s *ArtifactService) updateExpiredArtifacts() {
+func (s *ArtifactService) markExpiredArtifacts() {
 	log := s.log
-	artifacts, err := s.repositories.Artifact().FindAllNowExpired()
+	artifacts, err := s.repositories.Artifact().FindAllTimeExpired()
 	if err != nil {
 		log.Error("unable fetch all now expired artifacts", slog.Any("err", err))
 		return
@@ -375,7 +388,7 @@ func (s *ArtifactService) updateExpiredArtifacts() {
 
 func (s *ArtifactService) removeExpiredArtifacts(limit int) {
 	log := s.log
-	artifacts, err := s.repositories.Artifact().FindAllExpired(ports.Limit(limit))
+	artifacts, err := s.repositories.Artifact().FindAllStatusExpired(ports.Limit(limit))
 	if err != nil {
 		log.Error("unable fetch all expired artifacts", slog.Any("err", err))
 		return
@@ -388,6 +401,106 @@ func (s *ArtifactService) removeExpiredArtifacts(limit int) {
 		path := filepath.Join(artifact.Storage, artifact.ID)
 		if err := os.RemoveAll(path); err != nil {
 			log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
+		}
+		if err := s.repositories.Artifact().Delete(artifact); err != nil {
+			log.Error("artifact model delete failed", slog.Any("err", err))
+		}
+	}
+}
+
+func (s *ArtifactService) checkBrokenArtifacts(limit int, artifacts []*models.Artifact) []*models.Artifact {
+	log := s.log
+	if len(artifacts) == 0 {
+		var err error
+		artifacts, err = s.repositories.Artifact().FindAllStatusNotBroken()
+		if err != nil {
+			log.Error("unable fetch all not broken artifacts", slog.Any("err", err))
+			return nil
+		}
+	}
+
+	for x := 0; x < limit && len(artifacts) > 0; x++ {
+		artifact := artifacts[0]
+		artifacts = artifacts[1:]
+		lib.Assert(!artifact.State.IsBroken())
+
+		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		loc := filepath.Join(artifact.Storage, artifact.ID)
+		size, createdAt, checksum, err := s.verifyArtifact(loc)
+		is_broken := false
+		if err != nil {
+			log.Error("unable verify artifact", slog.Any("err", err))
+			is_broken = true
+		}
+		if err == nil && size != int64(artifact.Size) {
+			log.Error("artifact size dont match", slog.Any("size", size), slog.Any("artifact.Size", artifact.Size))
+			is_broken = true
+		}
+		if err == nil && createdAt != artifact.CreatedAt {
+			log.Error("artifact createdAt dont match", slog.Any("createdAt", createdAt), slog.Any("artifact.CreatedAt", artifact.CreatedAt))
+			is_broken = true
+		}
+		if err == nil && checksum != artifact.Checksum {
+			log.Error("artifact checksum dont match", slog.Any("checksum", checksum), slog.Any("artifact.Checksum", artifact.Checksum))
+			is_broken = true
+		}
+
+		if is_broken {
+			log.Warn("mark artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+			artifact.State |= vo.ArtifactIsBroken
+			err := s.repositories.Artifact().Update(artifact)
+			if err != nil {
+				log.Error("unable set artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+			}
+			s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+		}
+	}
+
+	return artifacts
+}
+
+func (s *ArtifactService) removeBrokenArtifacts(limit int) {
+	log := s.log
+	artifacts, err := s.repositories.Artifact().FindAllStatusBroken(ports.Limit(limit))
+	if err != nil {
+		log.Error("unable fetch all expired artifacts", slog.Any("err", err))
+		return
+	}
+
+	for _, artifact := range artifacts {
+		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log.Info("process broken artifact")
+		lib.Assert(artifact.State.IsBroken())
+		path := filepath.Join(artifact.Storage, artifact.ID)
+
+		// detect the location for artifact to be moved to (or removed)
+		repo, err := s.repositories.Repo().FindByID(artifact.RepoID)
+		if err != nil {
+			log.Error("unable fetch repo model", slog.Any("err", err))
+			continue
+		}
+
+		broken := repo.Broken
+		if broken == "" {
+			continue
+		}
+		remove := false
+		if broken == "/dev/null" {
+			remove = true
+		}
+
+		if remove {
+			log.Info("remove broken artifact", slog.Any("path", path))
+			if err := os.RemoveAll(path); err != nil {
+				log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
+			}
+		}
+		if !remove {
+			newpath := filepath.Join(broken, strings.Join([]string{repo.ID, artifact.ID}, "-"))
+			log.Info("move broken artifact", slog.Any("path", path), slog.Any("newpath", newpath))
+			if err := os.Rename(path, newpath); err != nil {
+				log.Error("artifact path move failed", slog.Any("path", path), slog.Any("newpath", newpath), slog.Any("err", err))
+			}
 		}
 		if err := s.repositories.Artifact().Delete(artifact); err != nil {
 			log.Error("artifact model delete failed", slog.Any("err", err))

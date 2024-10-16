@@ -7,9 +7,10 @@ type ArtifactRepository interface {
 	Update(model *models.Artifact) error
 	Delete(model *models.Artifact) error
 	FindAll() ([]*models.Artifact, error)
-	FindAllExpired(flags ...interface{}) ([]*models.Artifact, error)
-	FindAllNowExpired() ([]*models.Artifact, error)
-	FindAllNotExpired() ([]*models.Artifact, error)
+	FindAllTimeExpired() ([]*models.Artifact, error)
+	FindAllStatusExpired(flags ...interface{}) ([]*models.Artifact, error)
+	FindAllStatusNotBroken() ([]*models.Artifact, error)
+	FindAllStatusBroken(flags ...interface{}) ([]*models.Artifact, error)
 	FindByID(repoID models.RepoID, artifactID models.ArtifactID, flags ...interface{}) (*models.Artifact, error)
 	IterateAll(func(*models.Artifact) (bool, error)) error
 }

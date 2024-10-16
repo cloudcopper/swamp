@@ -91,17 +91,32 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 	return artifact, err
 }
 
-// FindAllExpired returns all expired artifacts
-// as calculated by fields CreatedAt and ExpiredAt and proper state.
-// It will not returns non expireable (CreatedAt == ExpiredAt) artifacts.
-func (r *ArtifactRepository) FindAllExpired(flags ...interface{}) ([]*models.Artifact, error) {
+// FindAllTimeExpired returns all now expired artifacts.
+// Its artifacts which are expired now but has no proper state.
+func (r *ArtifactRepository) FindAllTimeExpired() ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
 	now := time.Now().UTC().Unix()
 	db := r.db
 	db = db.Order("expired_at ASC")
 	db = db.Where("expired_at != created_at")
 	db = db.Where("expired_at < ?", now)
-	db = db.Where("state & ? == ?", vo.ArtifactIsExpired, vo.ArtifactIsExpired)
+	db = db.Where("state & ? != ?", vo.ArtifactIsExpired, vo.ArtifactIsExpired)
+	err := db.Find(&artifacts).Error
+	return artifacts, err
+}
+
+// FindAllStatusExpired returns all expired artifacts
+// as calculated by fields CreatedAt and ExpiredAt and proper state.
+// It will not returns non expireable (CreatedAt == ExpiredAt) artifacts,
+// nor broken expired.
+func (r *ArtifactRepository) FindAllStatusExpired(flags ...interface{}) ([]*models.Artifact, error) {
+	var artifacts []*models.Artifact
+	now := time.Now().UTC().Unix()
+	db := r.db
+	db = db.Order("expired_at ASC")
+	db = db.Where("expired_at != created_at")
+	db = db.Where("expired_at < ?", now)
+	db = db.Where("state == ?", vo.ArtifactIsExpired)
 
 	for _, flag := range flags {
 		switch v := flag.(type) {
@@ -114,31 +129,29 @@ func (r *ArtifactRepository) FindAllExpired(flags ...interface{}) ([]*models.Art
 	return artifacts, err
 }
 
-// FindAllNowExpired returns all now expired artifacts.
-// Its artifacts which are expired now but has no proper state.
-func (r *ArtifactRepository) FindAllNowExpired() ([]*models.Artifact, error) {
+func (r *ArtifactRepository) FindAllStatusNotBroken() ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
-	now := time.Now().UTC().Unix()
 	db := r.db
-	db = db.Order("expired_at ASC")
-	db = db.Where("expired_at != created_at")
-	db = db.Where("expired_at < ?", now)
-	db = db.Where("state & ? != ?", vo.ArtifactIsExpired, vo.ArtifactIsExpired)
+	db = db.Order("created_at ASC")
+	db = db.Where("state & ? != ?", vo.ArtifactIsBroken, vo.ArtifactIsBroken)
+
 	err := db.Find(&artifacts).Error
 	return artifacts, err
 }
 
-// FindAllNotExpired returns all not expired artifacts
-// as calculated by fields CreatedAt and ExpiredAt.
-// It will not returns non expireable (CreatedAt == ExpiredAt) artifacts.
-// It does not takes into account State field.
-func (r *ArtifactRepository) FindAllNotExpired() ([]*models.Artifact, error) {
+func (r *ArtifactRepository) FindAllStatusBroken(flags ...interface{}) ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
-	now := time.Now().UTC().Unix()
 	db := r.db
-	db = db.Order("expired_at ASC")
-	db = db.Where("expired_at != created_at")
-	db = db.Where("expired_at >= ?", now)
+	db = db.Order("created_at ASC")
+	db = db.Where("state & ? == ?", vo.ArtifactIsBroken, vo.ArtifactIsBroken)
+
+	for _, flag := range flags {
+		switch v := flag.(type) {
+		case ports.Limit:
+			db = db.Limit(int(v))
+		}
+	}
+
 	err := db.Find(&artifacts).Error
 	return artifacts, err
 }

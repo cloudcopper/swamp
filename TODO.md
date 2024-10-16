@@ -1,17 +1,9 @@
 TODO
 ====
-- artifacts checks functionality
--- starts 30 minutes after app startup
--- periodic with arbitrary interval or evenly distributed (should it be per project defined?) ArtifactsCheckInterval and ArtifactsCheckDuration - only one shall be defined
--- mark artifact broken (Artifact.State field)
--- if repo has no Repo.Broken defined then artifacts presents all the time
--- broken artifacts suppose to be moved on second cicle
--- broken as /dev/null means to be deleted
--- Handle manual artifact removal from artifact storage
-
 - meta for artifacts. use similar to the checksum algo way???
 -- with blacklist for some variables - i.e *PASSWORD* value should be *************
 -- with url support (to have i.e. back links)
+-- remove model artifact should remove its metas too
 
 - artifacts download as separate file or aggregate (.zip)
 -- broken artifacts can not be downloaded within single click (figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id)
@@ -29,6 +21,10 @@ CUSTOM.md - how to customize
 -- custom 404 ?
 
 - tests - increate test coverage
+
+- artifacts checks functionality
+-- Mark broken files in file.State
+-- Handle manual artifact removal from artifact storage
 
 - access log
 - input web (the way to put over http new artifacts)

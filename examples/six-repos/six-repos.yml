@@ -32,6 +32,7 @@ abc-gen2:
   name:        "ABC Gen2"
   description: "ABC Gen2 project repo description"
   retention:   "168h" # 7d
+  broken:      "/tmp"
 
 diplo:
   <<:          [*defaults, *2weeks]
@@ -43,6 +44,7 @@ triceratops:
   name:        "Triceratops"
   description: "Triceratops project repo description. Only one hour retention time."
   retention:   "1h"
+  broken:      "/dev/null"
 
 jump:
   <<:          [*defaults, *2weeks]
