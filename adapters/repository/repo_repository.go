@@ -6,16 +6,21 @@ import (
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
 )
 
 type RepoRepository struct {
-	db ports.DB
+	db        ports.DB
+	fs        ports.FS
+	validator *validator.Validate
 }
 
-func NewRepoRepository(db ports.DB) (*RepoRepository, error) {
+func NewRepoRepository(db ports.DB, fs ports.FS) (*RepoRepository, error) {
 	r := &RepoRepository{
-		db: db,
+		db:        db,
+		fs:        fs,
+		validator: lib.NewValidator(fs),
 	}
 	_, err := r.FindAll()
 	return r, err
@@ -23,7 +28,7 @@ func NewRepoRepository(db ports.DB) (*RepoRepository, error) {
 
 func (r *RepoRepository) Create(model *models.Repo) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
-		if err := model.Validate(); err != nil {
+		if err := model.Validate(r.validator); err != nil {
 			return fmt.Errorf("invalid repo object: %w", err)
 		}
 

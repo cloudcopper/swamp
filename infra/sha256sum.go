@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -13,14 +12,15 @@ import (
 	"github.com/cloudcopper/swamp/adapters"
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/ports"
 )
 
 type Sha256 struct {
 }
 
 // Sum return checksum of given file or error
-func (s *Sha256) Sum(fileName string) ([]byte, error) {
-	file, err := os.Open(fileName)
+func (s *Sha256) Sum(fs ports.FS, fileName string) ([]byte, error) {
+	file, err := fs.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -37,11 +37,11 @@ func (s *Sha256) Sum(fileName string) ([]byte, error) {
 
 // CheckFiles return list of good files, list of bad files as specified by checksumFileName
 // or first error. Files must be returned with abs path
-func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error) {
+func (s *Sha256) CheckFiles(fs ports.FS, checksumFileName string) ([]string, []string, error) {
 	goodFiles, badFiles := []string{}, []string{}
 	dir := filepath.Dir(checksumFileName)
 
-	file, err := os.Open(checksumFileName)
+	file, err := fs.Open(checksumFileName)
 	if err != nil {
 		return goodFiles, badFiles, err
 	}
@@ -72,7 +72,7 @@ func (s *Sha256) CheckFiles(checksumFileName string) ([]string, []string, error)
 			return goodFiles, badFiles, err
 		}
 
-		sum, err := s.Sum(fileName)
+		sum, err := s.Sum(fs, fileName)
 		if err != nil {
 			badFiles = append(badFiles, fileName)
 			return goodFiles, badFiles, err

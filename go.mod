@@ -18,6 +18,7 @@ require (
 	github.com/orandin/slog-gorm v1.4.0
 	github.com/phsym/console-slog v0.3.1
 	github.com/samber/slog-chi v1.11.1
+	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.9.0
 	github.com/unrolled/render v1.6.1
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c

@@ -1,11 +1,15 @@
 package lib
 
-import "os"
+import (
+	"os"
+
+	"github.com/spf13/afero"
+)
 
 // CreateFile creates file name and writes there content.
 // The file must not exists.
-func CreateFile(name string, content string) error {
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
+func CreateFile(fs afero.Fs, name string, content string) error {
+	f, err := fs.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0660)
 	if err != nil {
 		return err
 	}

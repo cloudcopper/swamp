@@ -3,6 +3,8 @@ package lib
 import (
 	"errors"
 	"os"
+
+	"github.com/spf13/afero"
 )
 
 func IsDirectoryExist(name string) bool {
@@ -17,17 +19,17 @@ func IsDirectoryExist(name string) bool {
 	return true
 }
 
-// NoSuchFile return true is file name does not exists
-func NoSuchFile(name string) bool {
-	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
+// NoSuchFile return true if file name does not exists
+func NoSuchFile(fs afero.Fs, name string) bool {
+	if _, err := fs.Stat(name); errors.Is(err, os.ErrNotExist) {
 		return true
 	}
 	return false
 }
 
 // The fileSize returns size of file or zero
-func FileSize(name string) int64 {
-	fi, err := os.Stat(name)
+func FileSize(fs afero.Fs, name string) int64 {
+	fi, err := fs.Stat(name)
 	if err != nil {
 		return 0
 

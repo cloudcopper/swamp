@@ -2,8 +2,8 @@ package models
 
 import (
 	"github.com/cloudcopper/swamp/domain/errors"
-	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
+	"github.com/go-playground/validator/v10"
 )
 
 type RepoID = string
@@ -23,8 +23,8 @@ type Repo struct {
 	Artifacts   Artifacts      `gorm:"foreignKey:RepoID" yaml:"-" validate:"-"`
 }
 
-func (model *Repo) Validate() error {
-	err := lib.Validate.Struct(model)
+func (model *Repo) Validate(validator *validator.Validate) error {
+	err := validator.Struct(model)
 	if err != nil {
 		return err
 	}

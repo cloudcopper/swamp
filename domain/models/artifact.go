@@ -6,8 +6,8 @@ import (
 
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/vo"
-	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
+	"github.com/go-playground/validator/v10"
 )
 
 type ArtifactID = string
@@ -29,8 +29,8 @@ type Artifact struct {
 	Files     ArtifactFiles    `gorm:"-" valudate:"-"`
 }
 
-func (model *Artifact) Validate() error {
-	err := lib.Validate.Struct(model)
+func (model *Artifact) Validate(validator *validator.Validate) error {
+	err := validator.Struct(model)
 	if err != nil {
 		return err
 	}

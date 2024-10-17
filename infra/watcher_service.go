@@ -10,6 +10,7 @@ import (
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/afero"
 )
 
 type WatcherService struct {
@@ -83,7 +84,7 @@ func (s *WatcherService) addDir(path string) error {
 }
 
 func (s *WatcherService) background() {
-	log, bus := s.log, s.bus
+	log, bus, fs := s.log, s.bus, afero.NewOsFs()
 	topicFileModified := fmt.Sprintf("%v-file-modified", s.id)
 	topicFileRemoved := fmt.Sprintf("%v-file-removed", s.id)
 	for {
@@ -121,12 +122,12 @@ func (s *WatcherService) background() {
 				continue
 			}
 			if event.Has(fsnotify.Create) {
-				size := lib.FileSize(file)
+				size := lib.FileSize(fs, file)
 				log.Debug("file created", slog.String("file", file), slog.Int64("size", size))
 				bus.Pub(topicFileModified, ports.Event{file})
 			}
 			if event.Has(fsnotify.Write) {
-				size := lib.FileSize(file)
+				size := lib.FileSize(fs, file)
 				log.Debug("file modified", slog.String("file", file), slog.Int64("size", size))
 				bus.Pub(topicFileModified, ports.Event{file})
 			}

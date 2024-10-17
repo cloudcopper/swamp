@@ -6,17 +6,23 @@ import (
 
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
+	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
 )
 
 type ArtifactRepository struct {
-	db ports.DB
+	db        ports.DB
+	fs        ports.FS
+	validator *validator.Validate
 }
 
-func NewArtifactRepository(db ports.DB) (*ArtifactRepository, error) {
+func NewArtifactRepository(db ports.DB, fs ports.FS) (*ArtifactRepository, error) {
 	r := &ArtifactRepository{
-		db: db,
+		db:        db,
+		fs:        fs,
+		validator: lib.NewValidator(fs),
 	}
 	_, err := r.FindAll()
 	return r, err
@@ -29,7 +35,7 @@ func (r *ArtifactRepository) Create(model *models.Artifact) error {
 				model.CreatedAt = time.Now().UTC().Unix()
 			}
 		*/
-		if err := model.Validate(); err != nil {
+		if err := model.Validate(r.validator); err != nil {
 			return fmt.Errorf("invalid artifact object: %w", err)
 		}
 

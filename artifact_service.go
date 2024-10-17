@@ -20,6 +20,7 @@ import (
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/spf13/afero"
 )
 
 // ArtifactService listeing eventbus for next events:
@@ -108,7 +109,7 @@ func (s *ArtifactService) background() {
 				return
 			}
 			path := event[0]
-			s.checkInputFile(repos, path)
+			s.checkInputFile(repos, afero.NewOsFs(), path)
 		case event, ok := <-s.chTopicDanglingRepoArtifact:
 			if !ok {
 				return
@@ -142,7 +143,7 @@ func (s *ArtifactService) background() {
 	}
 }
 
-func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
+func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path string) {
 	log := s.log.With(slog.String("path", path))
 	log.Debug("detect modified")
 
@@ -157,7 +158,7 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
 		log.Debug("path match repo")
 
 		// Check the path is a good checksum
-		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, path)
+		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, fs, path)
 		if err == errors.ErrIsNotChecksumFile {
 			continue
 		}
@@ -189,11 +190,12 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, path string) {
 				lib.Assert(lib.IsAbs(file))
 				name = file
 			} else {
-				if !lib.IsDirectoryExist(name) {
+				exist, _ := afero.DirExists(fs, name)
+				if !exist {
 					continue
 				}
 			}
-			if err := os.RemoveAll(name); err != nil {
+			if err := fs.RemoveAll(name); err != nil {
 				log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
 			}
 		}
@@ -233,7 +235,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 
 	loc := filepath.Join(repo.Storage, artifactID)
-	size, createdAt, checksum, err := s.verifyArtifact(loc)
+	size, createdAt, checksum, err := s.verifyArtifact(afero.NewOsFs(), loc)
 	if err != nil {
 		log.Error("unable to verify aritfact", slog.Any("err", err))
 		s.bus.Pub(ports.TopicBrokenRepoArtifact, ports.Event{repoID, artifactID})
@@ -290,7 +292,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 // The verifyArtifact check the location
 // has only artifact files,
 // and returns createdAt, checksum or error
-func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string, error) {
+func (s *ArtifactService) verifyArtifact(fs ports.FS, location string) (int64, int64, string, error) {
 	checksumFile, files := "", []string{}
 
 	w := disk.NewFilepathWalk()
@@ -313,7 +315,7 @@ func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string,
 		return true, nil
 	})
 
-	checksum, goodFiles, badFiles, err := adapters.CheckChecksum(s.log, checksumFile)
+	checksum, goodFiles, badFiles, err := adapters.CheckChecksum(s.log, fs, checksumFile)
 	if err != nil {
 		s.log.Error("unable to checksum artifact", slog.String("checksumFile", checksumFile), slog.Any("err", err))
 		return 0, 0, "", errors.ErrArtifactIsBroken
@@ -360,7 +362,7 @@ func (s *ArtifactService) verifyArtifact(location string) (int64, int64, string,
 
 	size := int64(0)
 	for _, file := range goodFiles {
-		size += lib.FileSize(file)
+		size += lib.FileSize(fs, file)
 	}
 
 	return size, createdAt, checksum, nil
@@ -426,7 +428,7 @@ func (s *ArtifactService) checkBrokenArtifacts(limit int, artifacts []*models.Ar
 
 		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
 		loc := filepath.Join(artifact.Storage, artifact.ID)
-		size, createdAt, checksum, err := s.verifyArtifact(loc)
+		size, createdAt, checksum, err := s.verifyArtifact(afero.NewOsFs(), loc)
 		is_broken := false
 		if err != nil {
 			log.Error("unable verify artifact", slog.Any("err", err))

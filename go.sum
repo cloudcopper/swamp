@@ -57,6 +57,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/samber/slog-chi v1.11.1 h1:VNIGkGBCW+Tpa/nomS+MoDG9uZ08wK256mnF8zw9FbU=
 github.com/samber/slog-chi v1.11.1/go.mod h1:7qAkvO1Ip/qlIo0x7vysl4xIAtZF6CGFLtVNQDX2Nvc=
+github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
+github.com/spf13/afero v1.11.0/go.mod h1:GH9Y3pIexgf1MTIWtNGyogA5MwRIDXGUr+hbWNoBjkY=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/unrolled/render v1.6.1 h1:Qa7dLBJ1/DLogeAEINpMnMuUqpFTEzBPZXDrXvyiVNc=

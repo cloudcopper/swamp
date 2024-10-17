@@ -21,12 +21,12 @@ import (
 	"github.com/cloudcopper/swamp/domain/vo"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
+	"github.com/cloudcopper/swamp/lib/random"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
-	"github.com/go-loremipsum/loremipsum"
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
-	"golang.org/x/exp/rand"
+	"github.com/spf13/afero"
 )
 
 var (
@@ -45,10 +45,6 @@ var (
 		types.Duration(30 * 24 * time.Hour),
 		types.Duration(3 * 30 * 24 * time.Hour),
 		types.Duration(365 * 24 * time.Hour),
-	}
-	brokens = []string{
-		"",
-		"/dev/null",
 	}
 	dirs = func() []string {
 		root := "/"
@@ -70,12 +66,23 @@ var (
 
 		return a
 	}()
+	brokens = []string{
+		"",
+		"/dev/null",
+		rs(dirs),
+	}
 	numRepoMetas          = []int{0, 10}
 	numRepoMetaNames      = []int{1, 4}
 	numRepoMetaValueTexts = []int{1, 4}
 
 	numArtifacts = []int{30, 600}
 	numFiles     = []int{1, 30}
+)
+
+var (
+	rv = random.Value
+	rw = random.Words
+	rs = random.Element[string]
 )
 
 func main() {
@@ -111,12 +118,13 @@ func app(log *slog.Logger) error {
 		return lib.NewErrorCode(err, errors.RetMigrateDatabaseError)
 	}
 	// Create repositories
-	repoRepository, err := repository.NewRepoRepository(db)
+	realFS := afero.NewOsFs()
+	repoRepository, err := repository.NewRepoRepository(db, realFS)
 	if err != nil {
 		log.Error("unable create repo repository", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateRepoRepositoryError)
 	}
-	artifactRepository, err := repository.NewArtifactRepository(db)
+	artifactRepository, err := repository.NewArtifactRepository(db, realFS)
 	if err != nil {
 		log.Error("unable create artifact repository", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateArtifactRepositoryError)
@@ -170,28 +178,26 @@ func app(log *slog.Logger) error {
 
 // Prefill database with random data
 func startup(log ports.Logger, repos domain.Repositories) error {
-	rand.Seed(uint64(time.Now().UnixNano()))
-
-	maxRepos := random(numRepos)
+	maxRepos := rv(numRepos)
 	log.Info("create repos", slog.Any("maxRepos", maxRepos))
 	for n := 0; n < maxRepos; n++ {
-		name := genWords(numRepoName)
+		name := rw(numRepoName)
 		repoID := genRepoID(name, numRepoIdLetters, numRepoIdNumbers)
 
 		meta := models.RepoMetas{}
-		for a := 0; a < random(numRepoMetas); a++ {
+		for a := 0; a < rv(numRepoMetas); a++ {
 			tld := []string{"com", "org", "net"}
-			name, value := genWords(numRepoMetaNames), ""
-			switch R([]string{"text", "http://", "https://", "mailto:"}) {
+			name, value := rw(numRepoMetaNames), ""
+			switch rs([]string{"text", "http://", "https://", "mailto:"}) {
 			case "text":
-				value = genWords(numRepoMetaValueTexts)
+				value = rw(numRepoMetaValueTexts)
 				value = strings.ToUpper(value[:1]) + value[1:]
 			case "http://":
-				value = "http://" + strings.ReplaceAll(genWords([]int{1, 3}), " ", ".") + "." + R(tld) + "/" + strings.ReplaceAll(genWords([]int{0, 4}), " ", "/")
+				value = "http://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
 			case "https://":
-				value = "https://" + strings.ReplaceAll(genWords([]int{1, 3}), " ", ".") + "." + R(tld) + "/" + strings.ReplaceAll(genWords([]int{0, 4}), " ", "/")
+				value = "https://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
 			case "mailto:":
-				value = "mailto:" + strings.ReplaceAll(genWords([]int{1, 3}), " ", ".") + "@" + strings.ReplaceAll(genWords([]int{1, 2}), " ", ".") + "." + R(tld)
+				value = "mailto:" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "@" + strings.ReplaceAll(rw([]int{1, 2}), " ", ".") + "." + rs(tld)
 			}
 			meta = append(meta, &models.RepoMeta{
 				RepoID: repoID,
@@ -203,11 +209,11 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 		repo := &models.Repo{
 			ID:          repoID,
 			Name:        name,
-			Description: gen.Sentences(random(numDescSentences)),
-			Input:       R(dirs),
-			Storage:     R(dirs),
-			Retention:   R(retentions),
-			Broken:      R(append(brokens, dirs...)),
+			Description: random.Sentences(numDescSentences),
+			Input:       rs(dirs),
+			Storage:     rs(dirs),
+			Retention:   random.Element(retentions),
+			Broken:      rs(append(brokens, dirs...)),
 			Size:        0,
 			Meta:        meta,
 		}
@@ -219,21 +225,21 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 		}
 		log.Info("created repo", slog.Any("repoID", repoID))
 
-		for m := 0; m < random(numArtifacts); m++ {
+		for m := 0; m < rv(numArtifacts); m++ {
 			artifactID := genArtifactID()
 
 			meta := []*models.ArtifactMeta{}
-			for x := 0; x < random([]int{5, 100}); x++ {
+			for x := 0; x < rv([]int{5, 100}); x++ {
 				m := &models.ArtifactMeta{
-					Key:   strings.ToUpper(strings.ReplaceAll(genWords([]int{1, 3}), " ", "_")),
-					Value: genWords([]int{1, 5}),
+					Key:   strings.ToUpper(strings.ReplaceAll(rw([]int{1, 3}), " ", "_")),
+					Value: rw([]int{1, 5}),
 				}
 				meta = append(meta, m)
 			}
 
-			createdAt := int64(random([]int{0, int(time.Now().UTC().Unix())}))
+			createdAt := int64(rv([]int{0, int(time.Now().UTC().Unix())}))
 			expiredAt := createdAt + int64(repo.Retention/1000000000)
-			state := vo.ArtifactState(random([]int{0, 3}))
+			state := vo.ArtifactState(rv([]int{0, 3}))
 			if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
 				state |= vo.ArtifactIsExpired
 			} else {
@@ -243,7 +249,7 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 				RepoID:    repoID,
 				ID:        artifactID,
 				Storage:   repo.Storage,
-				Size:      types.Size(random([]int{1024, 150 * 1024 * 1024})),
+				Size:      types.Size(rv([]int{1024, 150 * 1024 * 1024})),
 				State:     state,
 				CreatedAt: createdAt,
 				ExpiredAt: expiredAt,
@@ -262,37 +268,15 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 	return nil
 }
 
-// The random returns value between a[0] and a[1]
-func random(a []int) int {
-	min, max := a[0], a[1]
-	return rand.Intn(max-min+1) + min
-}
-
-// R returns random element of a
-func R[T any](a []T) T {
-	return a[random([]int{0, len(a) - 1})]
-}
-
-func genWords(r []int) string {
-	name := ""
-	for x := 0; x < random(r); x++ {
-		if x != 0 {
-			name += " "
-		}
-		name += gen.Word()
-	}
-	return name
-}
-
 func genRepoID(name string, l []int, n []int) string {
 	repoID := strings.ReplaceAll(name, " ", "_")
-	repoID = repoID[:random(l)]
+	repoID = repoID[:rv(l)]
 	repoID = strings.ToLower(repoID)
-	if x := random(n); x > 0 {
+	if x := rv(n); x > 0 {
 		repoID += "-"
 		for n := 0; n < x; n++ {
 			digit := "0123456789"
-			repoID += string(digit[random([]int{0, 9})])
+			repoID += string(digit[rv([]int{0, 9})])
 		}
 	}
 	return repoID
@@ -300,20 +284,20 @@ func genRepoID(name string, l []int, n []int) string {
 
 // The genChecksum returns random sha256 checksum
 func genChecksum() string {
-	b := genWords([]int{10, 20})
+	b := rw([]int{10, 20})
 	hash := sha256.New()
 	sum := hash.Sum([]byte(b))
 	return hex.EncodeToString(sum)
 }
 
 func genArtifactID() string {
-	switch R([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
+	switch rs([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
 	case "hash":
 		return genChecksum()[:64]
 	case "short-hash":
 		return genChecksum()[:8]
 	case "dirty":
-		return fmt.Sprintf("v%s-%d-%s-dirty", genSemver(), random([]int{1, 10}), genChecksum()[:8])
+		return fmt.Sprintf("v%s-%d-%s-dirty", genSemver(), rv([]int{1, 10}), genChecksum()[:8])
 	case "uuid":
 		return uuid.New().String()
 	case "ulid":
@@ -323,21 +307,20 @@ func genArtifactID() string {
 }
 
 func genSemver() string {
-	switch R([]string{"x.x", "x.x.x", "x.x.x.x", "x.x.x-x.x"}) {
+	switch rs([]string{"x.x", "x.x.x", "x.x.x.x", "x.x.x-x.x"}) {
 	case "x.x":
-		return fmt.Sprintf("%v.%v", random([]int{0, 20}), random([]int{0, 100}))
+		return fmt.Sprintf("%v.%v", rv([]int{0, 20}), rv([]int{0, 100}))
 	case "x.x.x":
-		return fmt.Sprintf("%v.%v.%v", random([]int{0, 20}), random([]int{0, 50}), random([]int{0, 200}))
+		return fmt.Sprintf("%v.%v.%v", rv([]int{0, 20}), rv([]int{0, 50}), rv([]int{0, 200}))
 	case "x.x.x.x":
-		return fmt.Sprintf("%v.%v.%v.%v", random([]int{0, 50}), random([]int{0, 100}), random([]int{0, 200}), random([]int{0, 100000}))
+		return fmt.Sprintf("%v.%v.%v.%v", rv([]int{0, 50}), rv([]int{0, 100}), rv([]int{0, 200}), rv([]int{0, 100000}))
 	case "x.x.x-x.x":
-		return fmt.Sprintf("%v.%v.%v-%v.%v", random([]int{0, 20}), random([]int{0, 50}), random([]int{0, 300}), R([]string{"alpha", "beta", "gamma"}), random([]int{0, 1000}))
+		return fmt.Sprintf("%v.%v.%v-%v.%v", rv([]int{0, 20}), rv([]int{0, 50}), rv([]int{0, 300}), rs([]string{"alpha", "beta", "gamma"}), rv([]int{0, 1000}))
 	}
 
 	return ""
 }
 
-var gen = loremipsum.New()
 var fakeStorage = &FakeStorage{}
 
 type FakeStorage struct {
@@ -348,24 +331,14 @@ func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (mo
 }
 func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.ArtifactFiles, error) {
 	files := models.ArtifactFiles{}
-	for x := 0; x < random(numFiles); x++ {
+	for x := 0; x < rv(numFiles); x++ {
 		file := &models.ArtifactFile{
-			Name:  genFileName(3),
-			Size:  types.Size(random([]int{128, 150000000})),
-			State: vo.ArtifactState(R([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1})),
+			Name:  filepath.Join(random.Filepath(3), random.FileName(3)),
+			Size:  types.Size(rv([]int{128, 150000000})),
+			State: vo.ArtifactState(random.Element([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1})),
 		}
 		files = append(files, file)
 	}
 
 	return files, nil
-}
-
-func genFileName(n int) string {
-	a := []string{}
-	for x := 0; x < random([]int{1, n}); x++ {
-		a = append(a, strings.ReplaceAll(genWords([]int{1, 3}), " ", "_"))
-	}
-
-	file := strings.Join(a, string(filepath.Separator)) + "." + R([]string{"bin", "txt", "srec", "jar", "tar.gz", "html", "iso"})
-	return file
 }

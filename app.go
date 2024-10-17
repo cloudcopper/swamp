@@ -18,6 +18,7 @@ import (
 	"github.com/cloudcopper/swamp/infra/disk"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/spf13/afero"
 )
 
 // App execute application and returns error, when complete by ctrl-c.
@@ -29,6 +30,8 @@ import (
 //   - embed.fs given as parameter (cmdFS)
 //   - package own embed.fs (appFS)
 func App(log ports.Logger, cmdFS embed.FS) error {
+	var realFS ports.FS = afero.NewOsFs()
+
 	// EventBus
 	var bus ports.EventBus = infra.NewEventBus()
 	defer bus.Shutdown()
@@ -62,12 +65,12 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 		return lib.NewErrorCode(err, errors.RetMigrateDatabaseError)
 	}
 	// Create repositories
-	repoRepository, err := repository.NewRepoRepository(db)
+	repoRepository, err := repository.NewRepoRepository(db, realFS)
 	if err != nil {
 		log.Error("unable create repo repository", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateRepoRepositoryError)
 	}
-	artifactRepository, err := repository.NewArtifactRepository(db)
+	artifactRepository, err := repository.NewArtifactRepository(db, realFS)
 	if err != nil {
 		log.Error("unable create artifact repository", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateArtifactRepositoryError)
@@ -75,7 +78,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	repositories := repository.NewRepositories(repoRepository, artifactRepository)
 
 	// Create artifact storage
-	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log)
+	artifactStorage, err := adapters.NewBasicArtifactStorageAdapter(log, realFS)
 	if err != nil {
 		log.Error("unable to create artifact storage", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetCreateArtifactStorageError)

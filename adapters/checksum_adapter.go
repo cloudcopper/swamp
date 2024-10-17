@@ -53,7 +53,7 @@ func IsChecksumFile(path string) bool {
 // and all files listed inside the checksumFileName.
 // It returns the checksum of the checksumFileName,
 // good files, broken files and error
-func CheckChecksum(log ports.Logger, checksumFileName string) (string, []string, []string, error) {
+func CheckChecksum(log ports.Logger, fs ports.FS, checksumFileName string) (string, []string, []string, error) {
 	lib.Assert(lib.IsAbs(checksumFileName))
 
 	fileName := filepath.Base(checksumFileName)
@@ -66,7 +66,7 @@ func CheckChecksum(log ports.Logger, checksumFileName string) (string, []string,
 		log.Debug("checksum filename match pattern", slog.String("checksumFileName", fileName), slog.String("pattern", it.pattern))
 
 		// Check checksum file
-		checksum, err := it.algo.Sum(checksumFileName)
+		checksum, err := it.algo.Sum(fs, checksumFileName)
 		if err != nil {
 			log.Warn("unable to calc checksum", slog.Any("err", err))
 			continue
@@ -79,7 +79,7 @@ func CheckChecksum(log ports.Logger, checksumFileName string) (string, []string,
 		log.Debug("checksum file is valid", slog.String("expected", expected))
 
 		// Check files listed in valid checksum file
-		goodFiles, badFiles, err := it.algo.CheckFiles(checksumFileName)
+		goodFiles, badFiles, err := it.algo.CheckFiles(fs, checksumFileName)
 		switch {
 		case err != nil:
 			log.Error("unable check content", slog.Any("goodFiles", goodFiles), slog.Any("badFiles", badFiles), slog.Any("err", err))

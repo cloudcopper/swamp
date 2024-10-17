@@ -18,16 +18,19 @@ import (
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/oklog/ulid/v2"
+	"github.com/spf13/afero"
 )
 
 type BasicArtifactStorageAdapter struct {
 	log ports.Logger
+	fs  ports.FS
 }
 
-func NewBasicArtifactStorageAdapter(log ports.Logger) (*BasicArtifactStorageAdapter, error) {
+func NewBasicArtifactStorageAdapter(log ports.Logger, fs ports.FS) (*BasicArtifactStorageAdapter, error) {
 	log = log.With(slog.String("entity", "BasicArtifactStorageAdapter"))
 	s := &BasicArtifactStorageAdapter{
 		log: log,
+		fs:  fs,
 	}
 
 	return s, nil
@@ -36,22 +39,24 @@ func NewBasicArtifactStorageAdapter(log ports.Logger) (*BasicArtifactStorageAdap
 func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, id models.ArtifactID, artifacts []string) (models.ArtifactID, int64, int64, error) {
 	lib.Assert(storage != "")
 	lib.Assert(len(artifacts) >= 1)
-	log := s.log
+	log, fs := s.log, s.fs
 	if id == "" {
 		id = ulid.Make().String()
 	}
 	log = log.With(slog.Any("storage", storage), slog.String("artifactID", string(id)))
 	log.Info("add artifacts", slog.Any("input", input), slog.Any("files", artifacts))
 
-	if !lib.IsDirectoryExist(storage) {
+	exist, _ := afero.DirExists(fs, storage)
+	if !exist {
 		return "", 0, 0, lib.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
-	if lib.IsDirectoryExist(dest) {
+	exist, _ = afero.DirExists(fs, dest)
+	if exist {
 		return "", 0, 0, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
-	if err := os.MkdirAll(dest, os.ModePerm); err != nil {
+	if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
 		return "", 0, 0, err
 	}
 
@@ -69,16 +74,16 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 		dir, file := filepath.Split(name)
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
-			if err := os.MkdirAll(dest, os.ModePerm); err != nil {
+			if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
 				return "", 0, 0, err
 			}
 		}
 		newpath := filepath.Join(dest, file)
 		// Move single artifact
-		if err := os.Rename(fileName, newpath); err != nil {
+		if err := fs.Rename(fileName, newpath); err != nil {
 			return "", 0, 0, err
 		}
-		size = size + lib.FileSize(newpath)
+		size = size + lib.FileSize(fs, newpath)
 	}
 
 	// Optional create file _createdAt.txt containing epoch time.
@@ -87,12 +92,12 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 	// Can be created by ```date +%s > _createdAt.txt```
 	now := time.Now().UTC().Unix()
 	file := filepath.Join(dest, "_createdAt.txt")
-	if err := lib.CreateFile(file, fmt.Sprintf("%v", now)); lib.NoSuchFile(file) && err != nil {
+	if err := lib.CreateFile(fs, file, fmt.Sprintf("%v", now)); lib.NoSuchFile(fs, file) && err != nil {
 		log.Warn("unable to create", slog.String("file", file), slog.Any("err", err))
 	}
 
 	// Read back creation time
-	a, err := os.ReadFile(file)
+	a, err := afero.ReadFile(fs, file)
 	if err != nil {
 		log.Warn("unable to read", slog.String("file", file), slog.Any("err", err))
 	}
@@ -108,7 +113,7 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 }
 
 func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactID models.ArtifactID) (models.ArtifactFiles, error) {
-	log := s.log
+	log, fs := s.log, s.fs
 	if !lib.IsDirectoryExist(storage) {
 		log.Error("storage not found", slog.String("storage", storage))
 		return nil, lib.ErrNoSuchDirectory{Path: storage}
@@ -132,7 +137,7 @@ func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactI
 		}
 		files = append(files, &models.ArtifactFile{
 			Name:  name,
-			Size:  types.Size(lib.FileSize(name)),
+			Size:  types.Size(lib.FileSize(fs, name)),
 			State: vo.ArtifactIsOK, // TODO Ideally we would have to check the checksum somehow here
 		})
 		return true, nil
