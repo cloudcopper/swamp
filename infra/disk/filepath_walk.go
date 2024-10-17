@@ -4,19 +4,20 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/charlievieth/fastwalk"
+	"github.com/cloudcopper/swamp/ports"
+	"github.com/spf13/afero"
 )
 
 type FilepathWalk struct {
+	fs ports.FS
 }
 
-func NewFilepathWalk() FilepathWalk {
-	return FilepathWalk{}
+func NewFilepathWalk(fs ports.FS) FilepathWalk {
+	return FilepathWalk{fs}
 }
 
 func (f *FilepathWalk) Walk(root string, fn func(name string, err error) (bool, error)) error {
-	config := &fastwalk.DefaultConfig
-	err := fastwalk.Walk(config, root, func(path string, d fs.DirEntry, err error) error {
+	err := afero.Walk(f.fs, root, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".git") {
 			return fs.SkipDir
 		}

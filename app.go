@@ -96,7 +96,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	// Create repo service
 	// - signal dangling artifacts at startup/repo update
 	// - handling artifacts retention
-	repoService := NewRepoService(log, bus, disk.NewFilepathWalk(), repoRepository)
+	repoService := NewRepoService(log, bus, disk.NewFilepathWalk(realFS), repoRepository)
 	defer repoService.Close()
 	// Create filesystem watcher for input files
 	inputWatcher, err := infra.NewWatcherService("input", log, bus)

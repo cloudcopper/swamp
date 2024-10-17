@@ -36,7 +36,7 @@ func NewBasicArtifactStorageAdapter(log ports.Logger, fs ports.FS) (*BasicArtifa
 	return s, nil
 }
 
-func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, id models.ArtifactID, artifacts []string) (models.ArtifactID, int64, int64, error) {
+func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, id models.ArtifactID, artifacts []string) (*ports.NewArtifactInfo, error) {
 	lib.Assert(storage != "")
 	lib.Assert(len(artifacts) >= 1)
 	log, fs := s.log, s.fs
@@ -48,24 +48,25 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 
 	exist, _ := afero.DirExists(fs, storage)
 	if !exist {
-		return "", 0, 0, lib.ErrNoSuchDirectory{Path: storage}
+		return nil, lib.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
 	exist, _ = afero.DirExists(fs, dest)
 	if exist {
-		return "", 0, 0, errors.ErrArtifactAlreadyExists{Path: dest}
+		return nil, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
 	if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
-		return "", 0, 0, err
+		return nil, err
 	}
 
 	// Move all artifacts
 	size := int64(0)
 	for _, fileName := range artifacts {
-		// The input mist be sanitized already!!!
+		// The input must be sanitized already!!!
 		lib.Assert(lib.IsSecureFileName(fileName))
 		lib.Assert(strings.HasPrefix(fileName, input))
+
 		// Using input, fileName and id to detect path withing artifact
 		name := fileName
 		name = strings.TrimPrefix(name, input)
@@ -75,13 +76,13 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
 			if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
-				return "", 0, 0, err
+				return nil, err
 			}
 		}
 		newpath := filepath.Join(dest, file)
 		// Move single artifact
 		if err := fs.Rename(fileName, newpath); err != nil {
-			return "", 0, 0, err
+			return nil, err
 		}
 		size = size + lib.FileSize(fs, newpath)
 	}
@@ -109,23 +110,32 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 	}
 	createdAt := t
 
-	return id, size, createdAt, nil
+	info := &ports.NewArtifactInfo{
+		ID:        id,
+		Size:      size,
+		CreatedAt: createdAt,
+	}
+
+	return info, nil
 }
 
 func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactID models.ArtifactID) (models.ArtifactFiles, error) {
 	log, fs := s.log, s.fs
-	if !lib.IsDirectoryExist(storage) {
+
+	exist, _ := afero.DirExists(fs, storage)
+	if !exist {
 		log.Error("storage not found", slog.String("storage", storage))
 		return nil, lib.ErrNoSuchDirectory{Path: storage}
 	}
 	path := filepath.Join(storage, artifactID)
-	if !lib.IsDirectoryExist(path) {
+	exist, _ = afero.DirExists(fs, path)
+	if !exist {
 		log.Error("artifact not found", slog.String("path", path))
 		return nil, lib.ErrNoSuchDirectory{Path: path}
 	}
 
 	files := models.ArtifactFiles{}
-	w := disk.NewFilepathWalk()
+	w := disk.NewFilepathWalk(fs)
 	w.Walk(path, func(name string, err error) (bool, error) {
 		if err != nil {
 			log.Error("filepath walk failed", slog.String("path", path), slog.Any("err", err))
@@ -149,7 +159,9 @@ func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactI
 			strings.TrimPrefix(b.Name, path+string(filepath.Separator)),
 		}
 		for i := range s {
-			if s[i][0] == '_' {
+			if strings.HasPrefix(s[i], "_created") {
+				s[i] = "zzzz" + s[i]
+			} else if s[i][0] == '_' {
 				s[i] = "zzz" + s[i]
 			}
 			if strings.HasSuffix(s[i], ".md5") {

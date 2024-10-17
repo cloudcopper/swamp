@@ -111,7 +111,8 @@ func (s *WatcherService) background() {
 			}
 
 			file := event.Name
-			if event.Has(fsnotify.Create) && lib.IsDirectoryExist(file) {
+			exist, _ := afero.DirExists(fs, file)
+			if event.Has(fsnotify.Create) && exist {
 				dir := file
 				log := log.With(slog.String("dir", dir))
 				log.Debug("directory created")

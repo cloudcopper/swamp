@@ -168,14 +168,29 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path
 		}
 		log.Info("checksum file verified", slog.Any("goodFiles", goodFiles))
 
+		// Try to get artifact metas
+		metas := map[string]string{}
+		for _, f := range goodFiles {
+			if !adapters.IsMetaFile(f) {
+				continue
+			}
+			meta, err := adapters.ParseMetaFile(log, fs, f)
+			if err != nil {
+				continue
+			}
+			for k, v := range meta {
+				metas[k] = v
+			}
+		}
+
 		// Create new artifacts
 		artifacts := append(goodFiles, path)
 		id := lib.GetFirstSubdir(repo.Input, path)
-		artifactID, size, createdAt, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
+		info, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
 		if err != nil {
 			log.Error("unable to create new artifacts", slog.Any("err", err))
 		}
-		log.Info("new artifact created", slog.String("artifactID", string(artifactID)))
+		log.Info("new artifact created", slog.Any("artifactID", info.ID))
 
 		// Cleanup input artifacts
 		log.Info("cleanup input artifacts")
@@ -200,24 +215,37 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path
 			}
 		}
 
+		// Covert artifact meta
+		meta := models.ArtifactMetas{}
+		for k, v := range metas {
+			meta = append(meta, &models.ArtifactMeta{
+				RepoID:     repo.ID,
+				ArtifactID: info.ID,
+				Key:        k,
+				Value:      v,
+			})
+		}
+
 		// Insert artifact record
+		createdAt := info.CreatedAt
 		expiredAt := createdAt + int64(repo.Retention/1000000000)
 		state := vo.ArtifactIsOK
 		if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
 			state |= vo.ArtifactIsExpired
 		}
 		artifact := &models.Artifact{
-			ID:        artifactID,
+			ID:        info.ID,
 			RepoID:    repo.ID,
 			Storage:   repo.Storage,
-			Size:      types.Size(size),
+			Size:      types.Size(info.Size),
 			State:     state,
-			CreatedAt: createdAt,
+			CreatedAt: info.CreatedAt,
 			ExpiredAt: expiredAt,
 			Checksum:  checksum,
+			Meta:      meta,
 		}
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
-			log.Error("unable create artifact record", slog.String("artifactID", string(artifactID)), slog.Any("err", err))
+			log.Error("unable create artifact record", slog.Any("artifactID", artifact.ID), slog.Any("err", err))
 		}
 		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
 		return
@@ -295,13 +323,14 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 func (s *ArtifactService) verifyArtifact(fs ports.FS, location string) (int64, int64, string, error) {
 	checksumFile, files := "", []string{}
 
-	w := disk.NewFilepathWalk()
+	w := disk.NewFilepathWalk(fs)
 	w.Walk(location, func(name string, err error) (bool, error) {
 		if err != nil {
 			s.log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))
 			return true, nil
 		}
-		if lib.IsDirectoryExist(name) {
+		exist, _ := afero.DirExists(fs, name)
+		if exist {
 			return true, nil
 		}
 		if adapters.IsChecksumFile(name) {

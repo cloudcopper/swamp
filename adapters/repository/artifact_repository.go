@@ -30,11 +30,6 @@ func NewArtifactRepository(db ports.DB, fs ports.FS) (*ArtifactRepository, error
 
 func (r *ArtifactRepository) Create(model *models.Artifact) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
-		/*
-			if model.CreatedAt == 0 {
-				model.CreatedAt = time.Now().UTC().Unix()
-			}
-		*/
 		if err := model.Validate(r.validator); err != nil {
 			return fmt.Errorf("invalid artifact object: %w", err)
 		}

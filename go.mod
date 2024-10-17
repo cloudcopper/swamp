@@ -5,7 +5,6 @@ go 1.22.0
 toolchain go1.22.8
 
 require (
-	github.com/charlievieth/fastwalk v1.0.8
 	github.com/cloudcopper/misc v0.1.0
 	github.com/cskr/pubsub/v2 v2.0.2
 	github.com/dustin/go-humanize v1.0.1

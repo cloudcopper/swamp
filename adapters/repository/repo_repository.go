@@ -74,8 +74,14 @@ func (r *RepoRepository) FindByID(id models.RepoID, flags ...interface{}) (*mode
 		switch v := flag.(type) {
 		case ports.WithRelationship:
 			if v {
+				db = db.Preload("Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
+				})
 				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
 					return db.Order("created_at DESC")
+				})
+				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
 				})
 			}
 		}

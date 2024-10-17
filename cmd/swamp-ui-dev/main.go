@@ -326,7 +326,7 @@ var fakeStorage = &FakeStorage{}
 type FakeStorage struct {
 }
 
-func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (models.ArtifactID, int64, int64, error) {
+func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (*ports.NewArtifactInfo, error) {
 	panic("not expected to be called atm!!!")
 }
 func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.ArtifactFiles, error) {

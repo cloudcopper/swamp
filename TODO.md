@@ -1,8 +1,7 @@
 TODO
 ====
-- meta for artifacts. use similar to the checksum algo way???
+- meta for artifacts
 -- with blacklist for some variables - i.e *PASSWORD* value should be *************
--- with url support (to have i.e. back links)
 -- remove model artifact should remove its metas too
 
 - artifacts download as separate file or aggregate (.zip)
@@ -32,3 +31,4 @@ CUSTOM.md - how to customize
 -- currently it is filesystem but may it be more flexible? minio?
 
 - gorm -> goent ???
+- uber fx ???

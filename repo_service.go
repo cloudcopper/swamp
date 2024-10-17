@@ -9,8 +9,8 @@ import (
 	"github.com/cloudcopper/swamp/domain"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra/disk"
-	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/spf13/afero"
 )
 
 type RepoService struct {
@@ -76,12 +76,13 @@ func (s *RepoService) checkRepoById(repoID models.RepoID) {
 }
 
 func (s *RepoService) checkRepo(repo *models.Repo) {
-	log := s.log.With(slog.Any("repoID", repo.ID))
+	log, fs := s.log.With(slog.Any("repoID", repo.ID)), afero.NewOsFs()
 	log.Debug("check repo")
 
 	// TODO Abstract out storage!!!!
 	storage := repo.Storage
-	if !lib.IsDirectoryExist(storage) {
+	exist, _ := afero.DirExists(fs, storage)
+	if !exist {
 		log.Error("storage not found", slog.String("storage", storage))
 		return
 	}
