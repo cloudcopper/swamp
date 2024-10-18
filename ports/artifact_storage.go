@@ -13,4 +13,5 @@ type NewArtifactInfo struct {
 type ArtifactStorage interface {
 	NewArtifact(input string, storage string, artifactID models.ArtifactID, artifacts []string) (*NewArtifactInfo, error)
 	GetArtifactFiles(storage string, artifactID models.ArtifactID) (models.ArtifactFiles, error)
+	RemoveArtifact(storage string, artifactID models.ArtifactID) error
 }

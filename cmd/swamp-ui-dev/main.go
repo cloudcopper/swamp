@@ -329,6 +329,9 @@ type FakeStorage struct {
 func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (*ports.NewArtifactInfo, error) {
 	panic("not expected to be called atm!!!")
 }
+func (*FakeStorage) RemoveArtifact(string, models.ArtifactID) error {
+	panic("not expected to be called atm!!!")
+}
 func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.ArtifactFiles, error) {
 	files := models.ArtifactFiles{}
 	for x := 0; x < rv(numFiles); x++ {

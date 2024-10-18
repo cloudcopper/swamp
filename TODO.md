@@ -1,9 +1,5 @@
 TODO
 ====
-- meta for artifacts
--- with blacklist for some variables - i.e *PASSWORD* value should be *************
--- remove model artifact should remove its metas too
-
 - artifacts download as separate file or aggregate (.zip)
 -- broken artifacts can not be downloaded within single click (figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id)
 -- webui marks broken files in artifact as well whole artifact
@@ -29,6 +25,9 @@ CUSTOM.md - how to customize
 - input web (the way to put over http new artifacts)
 - abstract out storage
 -- currently it is filesystem but may it be more flexible? minio?
+
+- blacklist for meta keys
+- blacklist for meta values - i.e *PASSWORD* should be *************
 
 - gorm -> goent ???
 - uber fx ???

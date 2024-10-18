@@ -120,15 +120,16 @@ func (s *ArtifactService) background() {
 			if !ok {
 				return
 			}
-			limit := config.TimerExpiredLimit
 			// Remove already expired artifacts
 			// and then update expired artifacts.
 			// That allows expired artifact to stay
 			// in db at least one cycle prior being removed.
 			// The limit defines how many expired artifacts
 			// per cycle can be removed.
+			limit := config.TimerExpiredLimit
 			s.removeExpiredArtifacts(limit)
-			s.markExpiredArtifacts()
+			now := time.Now().UTC().Unix()
+			s.markExpiredArtifacts(now)
 
 			timerExpired.Reset(config.TimerExpiredInterval)
 		case _, ok := <-timerBroken.C:
@@ -397,9 +398,9 @@ func (s *ArtifactService) verifyArtifact(fs ports.FS, location string) (int64, i
 	return size, createdAt, checksum, nil
 }
 
-func (s *ArtifactService) markExpiredArtifacts() {
+func (s *ArtifactService) markExpiredArtifacts(now int64) {
 	log := s.log
-	artifacts, err := s.repositories.Artifact().FindAllTimeExpired()
+	artifacts, err := s.repositories.Artifact().FindAllTimeExpired(now)
 	if err != nil {
 		log.Error("unable fetch all now expired artifacts", slog.Any("err", err))
 		return
@@ -429,9 +430,8 @@ func (s *ArtifactService) removeExpiredArtifacts(limit int) {
 		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
 		log.Info("remove expired artifact")
 		lib.Assert(artifact.State.IsExpired())
-		path := filepath.Join(artifact.Storage, artifact.ID)
-		if err := os.RemoveAll(path); err != nil {
-			log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
+		if err := s.artifactStorage.RemoveArtifact(artifact.Storage, artifact.ID); err != nil {
+			log.Error("artifact path remove failed", slog.Any("storage", artifact.Storage), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
 		}
 		if err := s.repositories.Artifact().Delete(artifact); err != nil {
 			log.Error("artifact model delete failed", slog.Any("err", err))

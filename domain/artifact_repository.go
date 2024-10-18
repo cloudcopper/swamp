@@ -7,7 +7,7 @@ type ArtifactRepository interface {
 	Update(model *models.Artifact) error
 	Delete(model *models.Artifact) error
 	FindAll() ([]*models.Artifact, error)
-	FindAllTimeExpired() ([]*models.Artifact, error)
+	FindAllTimeExpired(now int64) ([]*models.Artifact, error)
 	FindAllStatusExpired(flags ...interface{}) ([]*models.Artifact, error)
 	FindAllStatusNotBroken() ([]*models.Artifact, error)
 	FindAllStatusBroken(flags ...interface{}) ([]*models.Artifact, error)

@@ -183,6 +183,12 @@ func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactI
 	return files, nil
 }
 
+func (s *BasicArtifactStorageAdapter) RemoveArtifact(storage string, artifactID models.ArtifactID) error {
+	path := filepath.Join(storage, artifactID)
+	err := s.fs.RemoveAll(path)
+	return err
+}
+
 func (s *BasicArtifactStorageAdapter) Close() {
 	log := s.log
 	log.Info("closing")

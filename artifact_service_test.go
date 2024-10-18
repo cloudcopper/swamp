@@ -13,19 +13,19 @@ import (
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/random"
+	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestArtifactSericeCreateArtifactWithMeta(t *testing.T) {
-	assert := assert.New(t)
-	noErr := func(err error) {
-		assert.NoError(err)
-		if err != nil {
-			t.FailNow()
-		}
-	}
+// TestArtifactServiceScenario1:
+//   - Creates 3x repos
+//   - Create one artifact
+//   - Expire it
+//   - Remove expired artifact
+func TestArtifactServiceScenario1(t *testing.T) {
+	assert := require.New(t)
 
 	testRepoID := "repo2"
 	input := filepath.Join("/var/lib/swamp/input", testRepoID)
@@ -39,71 +39,80 @@ func TestArtifactSericeCreateArtifactWithMeta(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	// Create requested directories on fs
 	for _, dir := range dirs {
-		noErr(fs.MkdirAll(dir, os.ModePerm))
+		assert.NoError(fs.MkdirAll(dir, os.ModePerm))
 	}
 
 	repos := []*models.Repo{
 		{
-			ID:      "repo1",
-			Name:    "Repo1",
-			Input:   "/what/ever",
-			Storage: "/what/other",
+			ID:        "repo1",
+			Name:      "Repo1",
+			Input:     "/what/ever",
+			Storage:   "/what/other",
+			Retention: types.Duration(30 * 24 * time.Hour),
 		},
 		{
-			ID:      testRepoID,
-			Name:    "Repo2",
-			Input:   input,
-			Storage: storage,
+			ID:        testRepoID,
+			Name:      "Repo2",
+			Input:     input,
+			Storage:   storage,
+			Retention: types.Duration(24 * time.Hour),
 		},
 		{
-			ID:      "repo3",
-			Name:    "Repo3",
-			Input:   "/dont/care",
-			Storage: "/nobody/other",
+			ID:        "repo3",
+			Name:      "Repo3",
+			Input:     "/dont/care",
+			Storage:   "/nobody/other",
+			Retention: types.Duration(365 * 24 * time.Hour),
 		},
 	}
 
 	testFakeApp(t, fs, repos, func(app *testFakeAppInternals) {
-		fs, rr, st, as := app.fs, app.rr, app.st, app.as
+		db, fs, rr, ar, st, as := app.db, app.fs, app.rr, app.ar, app.st, app.as
 
 		//
-		// Create artifact for repo2
+		// - Create one artifact (in repo2)
 		//
 
-		// Create input artifacts
-		noErr(afero.WriteFile(fs, filepath.Join(input, "file1.bin"), random.ByteSlice(32*1024), 0644))
-		noErr(afero.WriteFile(fs, filepath.Join(input, "file2.bin"), random.ByteSlice(64*1024), 0644))
-		noErr(afero.WriteFile(fs, filepath.Join(input, "_export.txt"), []byte(random.Declare(32)), 0644))
-		noErr(afero.WriteFile(fs, filepath.Join(input, "_createdAt.txt"), []byte(fmt.Sprintf("%v", time.Now().UTC().Unix())), 0644))
+		// Create input artifact files
+		creationTime := time.Now().UTC().Unix()
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file1.bin"), random.ByteSlice(32*1024), 0644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file2.bin"), random.ByteSlice(64*1024), 0644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_export.txt"), []byte(random.Declare(32)), 0644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_createdAt.txt"), []byte(fmt.Sprintf("%v", creationTime)), 0644))
 		// Create checksum file
 		checksum := ""
 		sha256 := &infra.Sha256{}
 		info, err := afero.ReadDir(fs, input)
-		noErr(err)
+		assert.NoError(err)
 		for _, i := range info {
 			name := i.Name()
 			sum, err := sha256.Sum(fs, filepath.Join(input, name))
-			noErr(err)
+			assert.NoError(err)
 			checksum += fmt.Sprintf("%v  %s\n", hex.EncodeToString(sum), name)
 		}
-		noErr(afero.WriteFile(fs, filepath.Join(input, "xxxxxxxx.xxx"), []byte(checksum), 0644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "xxxxxxxx.xxx"), []byte(checksum), 0644))
 		sum, err := sha256.Sum(fs, filepath.Join(input, "xxxxxxxx.xxx"))
-		noErr(err)
+		assert.NoError(err)
 		checksumFileName := filepath.Join(input, fmt.Sprintf("%v.sha256sum", hex.EncodeToString(sum)))
-		noErr(fs.Rename(filepath.Join(input, "xxxxxxxx.xxx"), checksumFileName))
+		assert.NoError(fs.Rename(filepath.Join(input, "xxxxxxxx.xxx"), checksumFileName))
 
 		//
 		// Check preconditions ...
 		//
 		// ...repo shall has no artifacts
 		repoModel, err := rr.FindByID(testRepoID, ports.WithRelationship(true))
-		noErr(err)
+		assert.NoError(err)
 		assert.NotNil(repoModel)
 		assert.Equal(testRepoID, repoModel.ID)
 		assert.Equal(input, repoModel.Input)
 		assert.Equal(storage, repoModel.Storage)
 		assert.Empty(repoModel.Artifacts)
 		assert.Zero(repoModel.Size)
+		// ...no artifact metas exists
+		var metas models.ArtifactMetas
+		metas = models.ArtifactMetas{}
+		assert.NoError(db.Find(&metas).Error)
+		assert.Empty(metas)
 
 		//
 		// Signal to artifact serivce to check the checksum file
@@ -123,7 +132,7 @@ func TestArtifactSericeCreateArtifactWithMeta(t *testing.T) {
 
 		// ...repoModel properly updated
 		repoModel, err = rr.FindByID(testRepoID, ports.WithRelationship(true))
-		noErr(err)
+		assert.NoError(err)
 		assert.NotNil(repoModel)
 		assert.Equal(testRepoID, repoModel.ID)
 		assert.Len(repoModel.Artifacts, 1)
@@ -136,18 +145,67 @@ func TestArtifactSericeCreateArtifactWithMeta(t *testing.T) {
 		assert.Equal(vo.ArtifactIsOK, artifactModel.State)
 		// ...and has meta from _export.txt
 		assert.NotEmpty(artifactModel.Meta)
+		// ...artifact metas updated
+		metas = models.ArtifactMetas{}
+		assert.NoError(db.Find(&metas).Error)
+		assert.NotEmpty(metas)
 
 		// ...storage has artifacts
-		assert.True(lib.First(afero.Exists(fs, filepath.Join(storage, artifactModel.ID, "file1.bin"))))
-		assert.True(lib.First(afero.Exists(fs, filepath.Join(storage, artifactModel.ID, "file2.bin"))))
-		assert.True(lib.First(afero.Exists(fs, filepath.Join(storage, artifactModel.ID, "_export.txt"))))
-		assert.True(lib.First(afero.Exists(fs, filepath.Join(storage, artifactModel.ID, "_createdAt.txt"))))
+		storedArtifactPath := filepath.Join(storage, artifactModel.ID)
+		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "file1.bin"))))
+		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "file2.bin"))))
+		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "_export.txt"))))
+		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "_createdAt.txt"))))
 		_, fileName := filepath.Split(checksumFileName)
-		assert.True(lib.First(afero.Exists(fs, filepath.Join(storage, artifactModel.ID, fileName))))
+		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, fileName))))
 
 		// ...and has five(5) files as test created
 		files, err := st.GetArtifactFiles(repoModel.Storage, artifactModel.ID)
-		noErr(err)
+		assert.NoError(err)
 		assert.Len(files, 5)
+
+		//
+		// - Expire it
+		//
+		a, err := ar.FindAllStatusExpired()
+		assert.NoError(err)
+		assert.Empty(a)
+
+		now := creationTime + int64(repos[1].Retention/1000000000) + 1
+		as.markExpiredArtifacts(now)
+		a, err = ar.FindAllStatusExpired()
+		assert.NoError(err)
+		assert.Len(a, 1)
+		artifactModel = a[0]
+		assert.True(artifactModel.State.IsExpired())
+
+		//
+		// - Remove expired artifact
+		//
+		limit := 1
+		as.removeExpiredArtifacts(limit)
+
+		// ...shall has no status expured artifacts
+		a, err = ar.FindAllStatusExpired()
+		assert.NoError(err)
+		assert.Empty(a)
+		// ...shall has no artifacts
+		a, err = ar.FindAll()
+		assert.NoError(err)
+		assert.Empty(a)
+		// ...repo shall has no artifacts and be zero size
+		repoModel, err = rr.FindByID(testRepoID, ports.WithRelationship(true))
+		assert.NoError(err)
+		assert.Empty(repoModel.Artifacts)
+		assert.Zero(repoModel.Size)
+		// ...artifact meta shall be empty (we removed last artifact)
+		metas = models.ArtifactMetas{}
+		assert.NoError(db.Find(&metas).Error)
+		assert.Empty(metas)
+
+		// Check files are removed
+		exist, err := afero.DirExists(fs, storedArtifactPath)
+		assert.NoError(err)
+		assert.False(exist)
 	})
 }

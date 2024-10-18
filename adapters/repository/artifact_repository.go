@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
@@ -94,9 +93,8 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 
 // FindAllTimeExpired returns all now expired artifacts.
 // Its artifacts which are expired now but has no proper state.
-func (r *ArtifactRepository) FindAllTimeExpired() ([]*models.Artifact, error) {
+func (r *ArtifactRepository) FindAllTimeExpired(now int64) ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
-	now := time.Now().UTC().Unix()
 	db := r.db
 	db = db.Order("expired_at ASC")
 	db = db.Where("expired_at != created_at")
@@ -112,11 +110,9 @@ func (r *ArtifactRepository) FindAllTimeExpired() ([]*models.Artifact, error) {
 // nor broken expired.
 func (r *ArtifactRepository) FindAllStatusExpired(flags ...interface{}) ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
-	now := time.Now().UTC().Unix()
 	db := r.db
 	db = db.Order("expired_at ASC")
 	db = db.Where("expired_at != created_at")
-	db = db.Where("expired_at < ?", now)
 	db = db.Where("state == ?", vo.ArtifactIsExpired)
 
 	for _, flag := range flags {

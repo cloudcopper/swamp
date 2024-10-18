@@ -12,9 +12,11 @@ import (
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
 type testFakeAppInternals struct {
+	db *gorm.DB
 	fs ports.FS
 	rr domain.RepoRepository
 	ar domain.ArtifactRepository
@@ -70,6 +72,7 @@ func testFakeApp(t *testing.T, fs afero.Fs, repos []*models.Repo, callback func(
 
 	// Call the callback to continue test
 	app := &testFakeAppInternals{
+		db: db,
 		fs: fs,
 		rr: repoRepository,
 		ar: artifactRepository,
