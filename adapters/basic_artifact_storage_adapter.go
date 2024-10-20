@@ -13,7 +13,6 @@ import (
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
-	"github.com/oklog/ulid/v2"
 	"github.com/spf13/afero"
 )
 
@@ -32,27 +31,25 @@ func NewBasicArtifactStorageAdapter(log ports.Logger, fs ports.FS) (*BasicArtifa
 	return s, nil
 }
 
-func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, id models.ArtifactID, artifacts []string) (*ports.NewArtifactInfo, error) {
+func (s *BasicArtifactStorageAdapter) NewArtifact(src ports.FS, input string, artifacts []string, storage string, id models.ArtifactID) (*ports.NewArtifactInfo, error) {
 	lib.Assert(storage != "")
+	lib.Assert(id != "")
 	lib.Assert(len(artifacts) >= 1)
-	log, fs := s.log, s.fs
-	if id == "" {
-		id = ulid.Make().String()
-	}
+	log, dst := s.log, s.fs
 	log = log.With(slog.Any("storage", storage), slog.String("artifactID", string(id)))
 	log.Info("add artifacts", slog.Any("input", input), slog.Any("files", artifacts))
 
-	exist, _ := afero.DirExists(fs, storage)
+	exist, _ := afero.DirExists(dst, storage)
 	if !exist {
 		return nil, lib.ErrNoSuchDirectory{Path: storage}
 	}
 
 	dest := filepath.Join(storage, string(id))
-	exist, _ = afero.DirExists(fs, dest)
+	exist, _ = afero.DirExists(dst, dest)
 	if exist {
 		return nil, errors.ErrArtifactAlreadyExists{Path: dest}
 	}
-	if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
+	if err := dst.MkdirAll(dest, os.ModePerm); err != nil {
 		return nil, err
 	}
 
@@ -71,16 +68,16 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 		dir, file := filepath.Split(name)
 		dest := filepath.Join(dest, dir)
 		if dir != "" {
-			if err := fs.MkdirAll(dest, os.ModePerm); err != nil {
+			if err := dst.MkdirAll(dest, os.ModePerm); err != nil {
 				return nil, err
 			}
 		}
 		newpath := filepath.Join(dest, file)
 		// Move single artifact
-		if err := fs.Rename(fileName, newpath); err != nil {
+		if err := lib.MoveFile(src, fileName, dst, newpath); err != nil {
 			return nil, err
 		}
-		size = size + lib.FileSize(fs, newpath)
+		size = size + lib.FileSize(dst, newpath)
 	}
 
 	// Optional create file _createdAt.txt containing epoch time.
@@ -89,12 +86,12 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 	// Can be created by ```date +%s > _createdAt.txt```
 	now := time.Now().UTC().Unix()
 	file := filepath.Join(dest, "_createdAt.txt")
-	if err := lib.CreateFile(fs, file, fmt.Sprintf("%v", now)); lib.NoSuchFile(fs, file) && err != nil {
+	if err := lib.CreateFile(dst, file, fmt.Sprintf("%v", now)); lib.NoSuchFile(dst, file) && err != nil {
 		log.Warn("unable to create", slog.String("file", file), slog.Any("err", err))
 	}
 
 	// Read back creation time
-	a, err := afero.ReadFile(fs, file)
+	a, err := afero.ReadFile(dst, file)
 	if err != nil {
 		log.Warn("unable to read", slog.String("file", file), slog.Any("err", err))
 	}
@@ -107,7 +104,6 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 	createdAt := t
 
 	info := &ports.NewArtifactInfo{
-		ID:        id,
 		Size:      size,
 		CreatedAt: createdAt,
 	}

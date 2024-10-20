@@ -71,6 +71,9 @@ func (model *Artifact) Validate(validator *validator.Validate) error {
 		if f.ArtifactID != model.ID {
 			return errors.ErrIncorrectFileID
 		}
+		if f.State.IsBroken() {
+			model.State |= vo.ArtifactIsBroken
+		}
 	}
 
 	return nil

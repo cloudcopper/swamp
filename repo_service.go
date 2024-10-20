@@ -24,7 +24,6 @@ type RepoService struct {
 
 // NewRepoService create repo service:
 // - signal dangling artifacts at startup/repo update
-// - handling artifacts retention
 func NewRepoService(log ports.Logger, bus ports.EventBus, walk disk.FilepathWalk, repoRepository domain.RepoRepository) *RepoService {
 	log = log.With(slog.String("entity", "RepoService"))
 	s := &RepoService{
@@ -72,10 +71,10 @@ func (s *RepoService) checkRepoById(repoID models.RepoID) {
 		s.log.Error("unable to find repo", slog.Any("repoID", repoID), slog.Any("err", err))
 		return
 	}
-	s.checkRepo(repo)
+	s.checkRepoStorage(repo)
 }
 
-func (s *RepoService) checkRepo(repo *models.Repo) {
+func (s *RepoService) checkRepoStorage(repo *models.Repo) {
 	log, fs := s.log.With(slog.Any("repoID", repo.ID)), afero.NewOsFs()
 	log.Debug("check repo")
 

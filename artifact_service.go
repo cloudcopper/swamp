@@ -2,7 +2,6 @@ package swamp
 
 import (
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -20,6 +19,7 @@ import (
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
+	"github.com/oklog/ulid/v2"
 	"github.com/spf13/afero"
 )
 
@@ -33,6 +33,7 @@ type ArtifactService struct {
 	bus                         ports.EventBus
 	artifactStorage             ports.ArtifactStorage
 	repositories                domain.Repositories
+	fs                          ports.FS
 	chTopicRepoUpdated          chan ports.Event
 	chTopicInputFileModified    chan ports.Event
 	chTopicDanglingRepoArtifact chan ports.Event
@@ -51,6 +52,7 @@ func NewArtifactService(log ports.Logger, bus ports.EventBus, artifactStorage po
 		bus:                         bus,
 		artifactStorage:             artifactStorage,
 		repositories:                repositories,
+		fs:                          afero.NewOsFs(),
 		chTopicRepoUpdated:          bus.Sub(ports.TopicRepoUpdated),
 		chTopicInputFileModified:    bus.Sub(ports.TopicInputFileModified),
 		chTopicDanglingRepoArtifact: bus.Sub(ports.TopicDanglingRepoArtifact),
@@ -92,6 +94,8 @@ func (s *ArtifactService) background() {
 	defer timerBroken.Stop()
 	knownArtifacts := []*models.Artifact{}
 
+	fs := s.fs
+
 	for {
 		select {
 		case event, ok := <-s.chTopicRepoUpdated:
@@ -109,7 +113,9 @@ func (s *ArtifactService) background() {
 				return
 			}
 			path := event[0]
-			s.checkInputFile(repos, afero.NewOsFs(), path)
+			// TODO Can watcher run over ports.FS?
+			// TODO Should we change watcher to some poll/scan mode watcher which would ran well over ports.FS?
+			s.checkInputFile(repos, fs, path)
 		case event, ok := <-s.chTopicDanglingRepoArtifact:
 			if !ok {
 				return
@@ -144,133 +150,69 @@ func (s *ArtifactService) background() {
 	}
 }
 
-func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, checksumFile string) {
-	log := s.log.With(slog.String("path", checksumFile))
-	log.Debug("detect modified")
-
-	artifactStorage := s.artifactStorage
-
+// The checkInputFile from background where any changed in noticed.
+// The repos has all known cached atm repo definitions.
+// The fs is a file system where the even was detected.
+// The path is the full path of changes detected.
+func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path string) error {
 	for _, repo := range repos {
-		// Check the path belongs to repo
-		if !strings.HasPrefix(checksumFile, repo.Input) {
-			continue
+		if strings.HasPrefix(path, repo.Input) { // Check the path belongs to repo.Input
+			return s.checkRepoInput(repo, fs, path)
 		}
-		log := log.With(slog.Any("repoID", repo.ID))
-		log.Debug("path match repo")
-
-		// Check the path is a good checksum
-		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, fs, checksumFile)
-		if err == errors.ErrIsNotChecksumFile {
-			continue
-		}
-		if err != nil {
-			log.Error("unable to verify checksum file", slog.Any("goodFiles", goodFiles), slog.Any("badFile", badFiles), slog.Any("err", err))
-			break
-		}
-		log.Info("checksum file verified", slog.Any("goodFiles", goodFiles))
-
-		// Try to get artifact metas
-		metas := map[string]string{}
-		for _, f := range goodFiles {
-			if !adapters.IsMetaFile(f) {
-				continue
-			}
-			meta, err := adapters.ParseMetaFile(log, fs, f)
-			if err != nil {
-				continue
-			}
-			for k, v := range meta {
-				metas[k] = v
-			}
-		}
-
-		//  Fill artifact files
-		files := models.ArtifactFiles{}
-		if true {
-			addFile := func(filePath string, state vo.ArtifactState) {
-				fileName := strings.TrimPrefix(strings.TrimPrefix(filePath, repo.Input), string(filepath.Separator))
-				file := &models.ArtifactFile{
-					Name:  fileName,
-					Size:  types.Size(lib.FileSize(fs, filePath)),
-					State: state,
-				}
-				files = append(files, file)
-			}
-			for _, filePath := range goodFiles {
-				addFile(filePath, vo.ArtifactIsOK)
-			}
-			for _, filePath := range badFiles {
-				addFile(filePath, vo.ArtifactIsBroken)
-			}
-			addFile(checksumFile, vo.ArtifactIsOK)
-		}
-
-		// Create new artifacts
-		artifacts := append(goodFiles, checksumFile)
-		id := lib.GetFirstSubdir(repo.Input, checksumFile)
-		info, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
-		if err != nil {
-			log.Error("unable to create new artifacts", slog.Any("err", err))
-		}
-		log.Info("new artifact created", slog.Any("artifactID", info.ID))
-
-		// Cleanup input artifacts
-		log.Info("cleanup input artifacts")
-		input := repo.Input
-		for i := range artifacts {
-			// clean up in reverse order, so the checksum file is removed first
-			file := artifacts[len(artifacts)-i-1]
-			lib.Assert(strings.HasPrefix(file, input))
-			dir := lib.GetFirstSubdir(input, file)
-			name := filepath.Join(input, dir)
-			if dir == "" {
-				lib.Assert(lib.IsAbs(file))
-				name = file
-			} else {
-				exist, _ := afero.DirExists(fs, name)
-				if !exist {
-					continue
-				}
-			}
-			if err := fs.RemoveAll(name); err != nil {
-				log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
-			}
-		}
-
-		// Covert artifact meta
-		meta := models.ArtifactMetas{}
-		for k, v := range metas {
-			meta = append(meta, &models.ArtifactMeta{
-				Key:   k,
-				Value: v,
-			})
-		}
-
-		// Insert artifact record
-		createdAt := info.CreatedAt
-		expiredAt := createdAt + int64(repo.Retention/1000000000)
-		state := vo.ArtifactIsOK
-		if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
-			state |= vo.ArtifactIsExpired
-		}
-		artifact := &models.Artifact{
-			ID:        info.ID,
-			RepoID:    repo.ID,
-			Storage:   repo.Storage,
-			Size:      types.Size(info.Size),
-			State:     state,
-			CreatedAt: info.CreatedAt,
-			ExpiredAt: expiredAt,
-			Checksum:  checksum,
-			Meta:      meta,
-			Files:     files,
-		}
-		if err := s.repositories.Artifact().Create(artifact); err != nil {
-			log.Error("unable create artifact record", slog.Any("artifactID", artifact.ID), slog.Any("err", err))
-		}
-		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
-		return
 	}
+	return errors.ErrNotMatchRepoInput
+}
+func (s *ArtifactService) checkRepoInput(repo *models.Repo, fs ports.FS, checksumFile string) error {
+	log := s.log.With(slog.Any("checksumFile", checksumFile), slog.Any("repoID", repo.ID))
+
+	// Check the path is a good checksum
+	da := checksumDiskArtifact(log, fs, checksumFile)
+	if da.checksumError != nil {
+		return da.checksumError
+	}
+	log.Info("checksum file verified", slog.Any("goodFiles", da.goodFiles))
+
+	// get artifact meta and files
+	meta := da.getArtifactMeta(log)
+	files := da.getArtifactFiles(log)
+
+	// Create new artifacts
+	artifacts := da.goodFiles
+	artifactID := lib.GetFirstSubdir(repo.Input, da.checksumFile)
+	if artifactID == "" {
+		artifactID = ulid.Make().String()
+	}
+	log.Info("new artifact", slog.Any("artifactID", artifactID))
+
+	info, err := s.artifactStorage.NewArtifact(fs, repo.Input, artifacts, repo.Storage, artifactID)
+	if err != nil {
+		log.Error("unable to create new artifacts", slog.Any("err", err))
+	}
+
+	// Cleanup input artifacts
+	cleanInputArtifacts(log, fs, repo.Input, artifacts)
+
+	// Insert artifact record
+	createdAt := info.CreatedAt
+	expiredAt := createdAt + int64(repo.Retention/1000000000)
+	state := vo.ArtifactIsOK
+	artifact := &models.Artifact{
+		ID:        artifactID,
+		RepoID:    repo.ID,
+		Storage:   repo.Storage,
+		Size:      types.Size(info.Size),
+		State:     state,
+		CreatedAt: info.CreatedAt,
+		ExpiredAt: expiredAt,
+		Checksum:  da.checksum,
+		Meta:      meta,
+		Files:     files,
+	}
+	if err := s.repositories.Artifact().Create(artifact); err != nil {
+		log.Error("unable create artifact record", slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+	}
+	s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+	return nil
 }
 
 // The checkRepoArtifact checks the artifact inside repo storage.
@@ -284,7 +226,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 
 	loc := filepath.Join(repo.Storage, artifactID)
-	size, createdAt, checksum, err := s.verifyArtifact(afero.NewOsFs(), loc)
+	da, err := s.verifyArtifactLocation(s.fs, loc) // @checkRepoArtifact
 	if err != nil {
 		log.Error("unable to verify aritfact", slog.Any("err", err))
 		s.bus.Pub(ports.TopicBrokenRepoArtifact, ports.Event{repoID, artifactID})
@@ -298,19 +240,29 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 	if artifact.ID == models.EmptyArtifactID {
 		log.Info("dangling artifact")
-		expiredAt := createdAt + int64(repo.Retention/1000000000)
+		expiredAt := da.createdAt + int64(repo.Retention/1000000000)
 		state := vo.ArtifactIsOK
-		if expiredAt != createdAt && expiredAt < time.Now().UTC().Unix() {
+		if expiredAt != da.createdAt && expiredAt < time.Now().UTC().Unix() {
 			state |= vo.ArtifactIsExpired
 		}
-		artifact.ID = artifactID
-		artifact.RepoID = repoID
-		artifact.Storage = repo.Storage
-		artifact.Size = types.Size(size)
-		artifact.Checksum = checksum
-		artifact.State = state
-		artifact.CreatedAt = createdAt
-		artifact.ExpiredAt = expiredAt
+
+		// get artifact meta and files
+		meta := da.getArtifactMeta(log)
+		files := da.getArtifactFiles(log)
+
+		artifact := &models.Artifact{
+			ID:        artifactID,
+			RepoID:    repoID,
+			Storage:   repo.Storage,
+			Size:      types.Size(da.size),
+			Checksum:  da.checksum,
+			State:     state,
+			CreatedAt: da.createdAt,
+			ExpiredAt: expiredAt,
+			Meta:      meta,
+			Files:     files,
+		}
+
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
 			log.Error("unable create artifact record", slog.Any("err", err))
 			return
@@ -326,96 +278,44 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 		log.Error("wrong artifact found", slog.Any("unexpected artifact id", artifact.ID))
 		return
 	}
-	if artifact.CreatedAt == createdAt && artifact.Checksum != checksum {
-		log.Error("tampered artifact", slog.Any("original checksum", artifact.Checksum), slog.Any("checksum", checksum))
+	if artifact.CreatedAt == da.createdAt && artifact.Checksum != da.checksum {
+		log.Error("tampered artifact", slog.Any("original checksum", artifact.Checksum), slog.Any("checksum", da.checksum))
 		s.bus.Pub(ports.TopicBrokenRepoArtifact, ports.Event{repoID, artifactID})
 		return
 	}
-	if artifact.CreatedAt != createdAt && artifact.Checksum == checksum {
-		log.Warn("reuploaded artifact", slog.Any("originally createdAt", artifact.CreatedAt), slog.Any("createdAt", createdAt))
+	if artifact.CreatedAt != da.createdAt && artifact.Checksum == da.checksum {
+		log.Warn("reuploaded artifact", slog.Any("originally createdAt", artifact.CreatedAt), slog.Any("createdAt", da.createdAt))
 		// Do nothing - keep original details
 		return
 	}
 }
 
-// The verifyArtifact check the location
-// has only artifact files,
-// and returns createdAt, checksum or error
-func (s *ArtifactService) verifyArtifact(fs ports.FS, location string) (int64, int64, string, error) {
-	checksumFile, files := "", []string{}
+// The verifyArtifactLocation check the location artifact files
+func (s *ArtifactService) verifyArtifactLocation(fs ports.FS, location string) (*diskArtifact, error) {
+	log, fs := s.log, s.fs
 
-	w := disk.NewFilepathWalk(fs)
-	w.Walk(location, func(name string, err error) (bool, error) {
-		if err != nil {
-			s.log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))
-			return true, nil
-		}
-		exist, _ := afero.DirExists(fs, name)
-		if exist {
-			return true, nil
-		}
-		if adapters.IsChecksumFile(name) {
-			if checksumFile != "" {
-				s.log.Error("second checksum file detected", slog.String("checksumFile", checksumFile), slog.String("name", name))
-				return true, nil
-			}
-			checksumFile = name
-		}
-		files = append(files, name)
-		return true, nil
-	})
+	// Scan disk artifact
+	da := walkDiskArtifact(log, fs, location)
 
-	checksum, goodFiles, badFiles, err := adapters.CheckChecksum(s.log, fs, checksumFile)
-	if err != nil {
-		s.log.Error("unable to checksum artifact", slog.String("checksumFile", checksumFile), slog.Any("err", err))
-		return 0, 0, "", errors.ErrArtifactIsBroken
+	// Verify artifact state
+	if da.checksumError != nil {
+		log.Error("unable to checksum artifact", slog.String("checksumFile", da.checksumFile), slog.Any("err", da.checksumError))
+		return da, errors.ErrArtifactIsBroken
 	}
-	if len(badFiles) > 0 {
-		s.log.Error("bad files detected", slog.String("checksumFile", checksumFile), slog.Any("badFiles", badFiles))
-		return 0, 0, "", errors.ErrArtifactIsBroken
+	if len(da.badFiles) > 0 {
+		log.Error("bad files detected", slog.String("checksumFile", da.checksumFile), slog.Any("badFiles", da.badFiles))
+		return da, errors.ErrArtifactIsBroken
+	}
+	if len(da.goodFiles) != len(da.allFiles) {
+		log.Error("missmatch between good and actual files", slog.Any("goodFiles", da.goodFiles), slog.Any("files", da.allFiles))
+		return da, errors.ErrArtifactIsBroken
+	}
+	if slices.Compare(da.goodFiles, da.allFiles) != 0 {
+		log.Error("different files listed in good and actual files", slog.Any("goodFiles", da.goodFiles), slog.Any("files", da.allFiles))
+		return da, errors.ErrArtifactIsBroken
 	}
 
-	if !slices.Contains(goodFiles, checksumFile) {
-		s.log.Warn("checksum file is not in checksum file")
-		goodFiles = append(goodFiles, checksumFile)
-	}
-	createdAtName := filepath.Join(filepath.Dir(checksumFile), "_createdAt.txt")
-	if !slices.Contains(goodFiles, createdAtName) {
-		s.log.Warn("createdAt file is not in checksum file")
-		goodFiles = append(goodFiles, createdAtName)
-	}
-
-	if len(goodFiles) != len(files) {
-		s.log.Error("missmatch between good and actual files", slog.Any("goodFiles", goodFiles), slog.Any("files", files))
-		return 0, 0, "", errors.ErrArtifactIsBroken
-	}
-
-	slices.Sort(goodFiles)
-	slices.Sort(files)
-	if slices.Compare(goodFiles, files) != 0 {
-		s.log.Error("different files listed in good and actual files", slog.Any("goodFiles", goodFiles), slog.Any("files", files))
-		return 0, 0, "", errors.ErrArtifactIsBroken
-	}
-
-	// Read back creation time
-	a, err := os.ReadFile(createdAtName)
-	if err != nil {
-		s.log.Warn("unable to read", slog.String("file", createdAtName), slog.Any("err", err))
-	}
-	// Once external creation time might be created with tailing \n or even more
-	// parse only leading digits and ignore rest
-	t, err := strconv.ParseInt(lib.LeadingDigits(string(a)), 10, 64)
-	if err != nil {
-		s.log.Warn("unable convert creation time", slog.Any("err", err))
-	}
-	createdAt := t
-
-	size := int64(0)
-	for _, file := range goodFiles {
-		size += lib.FileSize(fs, file)
-	}
-
-	return size, createdAt, checksum, nil
+	return da, nil
 }
 
 func (s *ArtifactService) markExpiredArtifacts(now int64) {
@@ -474,40 +374,41 @@ func (s *ArtifactService) checkBrokenArtifacts(limit int, artifacts []*models.Ar
 		artifact := artifacts[0]
 		artifacts = artifacts[1:]
 		lib.Assert(!artifact.State.IsBroken())
-
-		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
-		loc := filepath.Join(artifact.Storage, artifact.ID)
-		size, createdAt, checksum, err := s.verifyArtifact(afero.NewOsFs(), loc)
-		is_broken := false
-		if err != nil {
-			log.Error("unable verify artifact", slog.Any("err", err))
-			is_broken = true
-		}
-		if err == nil && size != int64(artifact.Size) {
-			log.Error("artifact size dont match", slog.Any("size", size), slog.Any("artifact.Size", artifact.Size))
-			is_broken = true
-		}
-		if err == nil && createdAt != artifact.CreatedAt {
-			log.Error("artifact createdAt dont match", slog.Any("createdAt", createdAt), slog.Any("artifact.CreatedAt", artifact.CreatedAt))
-			is_broken = true
-		}
-		if err == nil && checksum != artifact.Checksum {
-			log.Error("artifact checksum dont match", slog.Any("checksum", checksum), slog.Any("artifact.Checksum", artifact.Checksum))
-			is_broken = true
-		}
-
-		if is_broken {
-			log.Warn("mark artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
-			artifact.State |= vo.ArtifactIsBroken
-			err := s.repositories.Artifact().Update(artifact)
-			if err != nil {
-				log.Error("unable set artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
-			}
-			s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
-		}
+		s.checkBrokenArtifact(artifact)
 	}
-
 	return artifacts
+}
+
+func (s *ArtifactService) checkBrokenArtifact(artifact *models.Artifact) {
+	log := s.log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+	loc := filepath.Join(artifact.Storage, artifact.ID)
+	da, err := s.verifyArtifactLocation(s.fs, loc) // @checkBrokenArtifact
+	is_broken := false
+	if err != nil {
+		log.Error("unable verify artifact", slog.Any("err", err))
+		is_broken = true
+	}
+	if err == nil && da.size != int64(artifact.Size) {
+		log.Error("artifact size dont match", slog.Any("size", da.size), slog.Any("artifact.Size", artifact.Size))
+		is_broken = true
+	}
+	if err == nil && da.createdAt != artifact.CreatedAt {
+		log.Error("artifact createdAt dont match", slog.Any("createdAt", da.createdAt), slog.Any("artifact.CreatedAt", artifact.CreatedAt))
+		is_broken = true
+	}
+	if err == nil && da.checksum != artifact.Checksum {
+		log.Error("artifact checksum dont match", slog.Any("checksum", da.checksum), slog.Any("artifact.Checksum", artifact.Checksum))
+		is_broken = true
+	}
+	if is_broken {
+		log.Warn("mark artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		artifact.State |= vo.ArtifactIsBroken
+		err := s.repositories.Artifact().Update(artifact)
+		if err != nil {
+			log.Error("unable set artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+		}
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+	}
 }
 
 func (s *ArtifactService) removeBrokenArtifacts(limit int) {
@@ -542,14 +443,14 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 
 		if remove {
 			log.Info("remove broken artifact", slog.Any("path", path))
-			if err := os.RemoveAll(path); err != nil {
+			if err := s.fs.RemoveAll(path); err != nil {
 				log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
 			}
 		}
 		if !remove {
 			newpath := filepath.Join(broken, strings.Join([]string{repo.ID, artifact.ID}, "-"))
 			log.Info("move broken artifact", slog.Any("path", path), slog.Any("newpath", newpath))
-			if err := os.Rename(path, newpath); err != nil {
+			if err := lib.MoveFile(s.fs, path, s.fs, newpath); err != nil {
 				log.Error("artifact path move failed", slog.Any("path", path), slog.Any("newpath", newpath), slog.Any("err", err))
 			}
 		}
@@ -557,4 +458,178 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 			log.Error("artifact model delete failed", slog.Any("err", err))
 		}
 	}
+}
+
+func cleanInputArtifacts(log ports.Logger, fs ports.FS, input string, artifacts []string) {
+	log.Info("cleanup input artifacts")
+	for i := range artifacts {
+		// clean up in reverse order, so the checksum file is removed first
+		file := artifacts[len(artifacts)-i-1]
+		lib.Assert(strings.HasPrefix(file, input))
+		dir := lib.GetFirstSubdir(input, file)
+		name := filepath.Join(input, dir)
+		if dir == "" {
+			lib.Assert(lib.IsAbs(file))
+			name = file
+		} else {
+			exist, _ := afero.DirExists(fs, name)
+			if !exist {
+				continue
+			}
+		}
+		if err := fs.RemoveAll(name); err != nil {
+			log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
+		}
+	}
+}
+
+type diskArtifact struct {
+	fs            ports.FS
+	location      string
+	allFiles      []string
+	goodFiles     []string
+	badFiles      []string
+	checksum      string
+	checksumFile  string
+	createdAt     int64
+	createdAtFile string
+	size          int64
+	checksumError error
+}
+
+// The walkDiskArtifact create diskArtifact object base on files in the location
+// The returned diskArtifact.checksumError will not be nil if checksum had a problems
+func walkDiskArtifact(log ports.Logger, fs ports.FS, location string) *diskArtifact {
+	da := &diskArtifact{
+		fs:       fs,
+		location: location,
+	}
+
+	// Detect checksum file and all files in location
+	w := disk.NewFilepathWalk(fs)
+	w.Walk(location, func(name string, err error) (bool, error) {
+		if err != nil {
+			log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))
+			return true, nil
+		}
+		exist, _ := afero.DirExists(fs, name)
+		if exist {
+			return true, nil
+		}
+		if adapters.IsChecksumFile(name) {
+			if da.checksumFile != "" {
+				log.Error("second checksum file detected", slog.String("checksumFile", da.checksumFile), slog.String("name", name))
+				return true, nil
+			}
+			da.checksumFile = name
+		}
+		da.allFiles = append(da.allFiles, name)
+		return true, nil
+	})
+
+	da.processChecksumFile(log)
+	return da
+}
+
+func checksumDiskArtifact(log ports.Logger, fs ports.FS, checksumFile string) *diskArtifact {
+	da := &diskArtifact{
+		fs:           fs,
+		checksumFile: checksumFile,
+	}
+
+	da.processChecksumFile(log)
+	return da
+}
+
+func (da *diskArtifact) processChecksumFile(log ports.Logger) error {
+	// Detect checksum, good files and bad files in location
+	da.checksum, da.goodFiles, da.badFiles, da.checksumError = adapters.CheckChecksum(log, da.fs, da.checksumFile)
+
+	// If needed, add checksum file and _createdAt.txt to good files
+	if !slices.Contains(da.goodFiles, da.checksumFile) {
+		log.Warn("checksum file is not in checksum file")
+		da.goodFiles = append(da.goodFiles, da.checksumFile)
+	}
+	da.createdAtFile = filepath.Join(filepath.Dir(da.checksumFile), "_createdAt.txt")
+	if lib.First(afero.Exists(da.fs, da.createdAtFile)) && !slices.Contains(da.goodFiles, da.createdAtFile) {
+		log.Warn("createdAt file is not in checksum file")
+		da.goodFiles = append(da.goodFiles, da.createdAtFile)
+	}
+	slices.Sort(da.goodFiles)
+	slices.Sort(da.allFiles)
+
+	// Read back creation time
+	a, err := afero.ReadFile(da.fs, da.createdAtFile)
+	if err != nil {
+		log.Warn("unable to read", slog.String("file", da.createdAtFile), slog.Any("err", err))
+	}
+	// Once external creation time might be created with tailing \n or even more
+	// parse only leading digits and ignore rest
+	t, err := strconv.ParseInt(lib.LeadingDigits(string(a)), 10, 64)
+	if err != nil {
+		log.Warn("unable convert creation time", slog.Any("err", err))
+	}
+	da.createdAt = t
+
+	// Calculate total size
+	da.size = 0
+	for _, file := range da.goodFiles {
+		da.size += lib.FileSize(da.fs, file)
+	}
+
+	return da.checksumError
+}
+
+func (da *diskArtifact) getArtifactMeta(log ports.Logger) models.ArtifactMetas {
+	metas := map[string]string{}
+	for _, f := range da.goodFiles {
+		if !adapters.IsMetaFile(f) {
+			continue
+		}
+		meta, err := adapters.ParseMetaFile(log, da.fs, f)
+		if err != nil {
+			continue
+		}
+		for k, v := range meta {
+			metas[k] = v
+		}
+	}
+
+	meta := models.ArtifactMetas{}
+	for k, v := range metas {
+		meta = append(meta, &models.ArtifactMeta{
+			Key:   k,
+			Value: v,
+		})
+	}
+
+	return meta
+}
+
+func (da *diskArtifact) getArtifactFiles(ports.Logger) models.ArtifactFiles {
+	files := models.ArtifactFiles{}
+	addFile := func(filePath string, state vo.ArtifactState) {
+		fileName := strings.TrimPrefix(strings.TrimPrefix(filePath, da.location), string(filepath.Separator))
+		size, err := lib.FileSize2(da.fs, filePath)
+		if err != nil { // mark file as broken, if can not get it size
+			state |= vo.ArtifactIsBroken
+		}
+		file := &models.ArtifactFile{
+			Name:  fileName,
+			Size:  types.Size(size),
+			State: state,
+		}
+		files = append(files, file)
+	}
+	for _, f := range da.goodFiles {
+		addFile(f, vo.ArtifactIsOK)
+	}
+	for _, f := range da.badFiles {
+		addFile(f, vo.ArtifactIsBroken)
+	}
+	if !slices.Contains(da.goodFiles, da.checksumFile) {
+		addFile(da.checksumFile, vo.ArtifactIsOK)
+	}
+
+	return files
 }

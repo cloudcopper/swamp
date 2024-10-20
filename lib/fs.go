@@ -15,7 +15,7 @@ func NoSuchFile(fs afero.Fs, name string) bool {
 	return false
 }
 
-// The fileSize returns size of file or zero
+// FileSize returns size of file or zero
 func FileSize(fs afero.Fs, name string) int64 {
 	fi, err := fs.Stat(name)
 	if err != nil {
@@ -23,4 +23,22 @@ func FileSize(fs afero.Fs, name string) int64 {
 
 	}
 	return fi.Size()
+}
+
+// FileSize2 returns size of file or error
+func FileSize2(fs afero.Fs, name string) (int64, error) {
+	fi, err := fs.Stat(name)
+	if err != nil {
+		return 0, err
+
+	}
+	return fi.Size(), nil
+}
+
+func MoveFile(src afero.Fs, oldname string, dst afero.Fs, newname string) error {
+	if src == dst {
+		return dst.Rename(oldname, newname)
+	}
+
+	panic("move across different FS not yet implemented!!!")
 }

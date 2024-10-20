@@ -14,6 +14,7 @@ const ErrUnsecureFileName = lib.Error("unsecure file name")
 const ErrArtifactIsBroken = lib.Error("artifact is broken")
 const ErrIncorrectMetaID = lib.Error("incorrect meta id")
 const ErrIncorrectFileID = lib.Error("incorrect file id")
+const ErrNotMatchRepoInput = lib.Error("not match repo input")
 
 type ErrArtifactAlreadyExists struct {
 	Path string

@@ -1,7 +1,10 @@
 package swamp
 
 import (
+	"encoding/hex"
+	"fmt"
 	"log/slog"
+	"path/filepath"
 	"testing"
 
 	"github.com/cloudcopper/swamp/adapters"
@@ -12,6 +15,7 @@ import (
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -81,4 +85,27 @@ func testFakeApp(t *testing.T, fs afero.Fs, repos []*models.Repo, callback func(
 	}
 
 	callback(app)
+}
+
+func sealArtifact(t *testing.T, fs afero.Fs, input string) string {
+	var err error
+	assert := require.New(t)
+	// Create checksum file
+	checksum := ""
+	sha256 := &infra.Sha256{}
+	info, err := afero.ReadDir(fs, input)
+	assert.NoError(err)
+	for _, i := range info {
+		name := i.Name()
+		sum, err := sha256.Sum(fs, filepath.Join(input, name))
+		assert.NoError(err)
+		checksum += fmt.Sprintf("%v  %s\n", hex.EncodeToString(sum), name)
+	}
+	assert.NoError(afero.WriteFile(fs, filepath.Join(input, "xxxxxxxx.xxx"), []byte(checksum), 0644))
+	sum, err := sha256.Sum(fs, filepath.Join(input, "xxxxxxxx.xxx"))
+	assert.NoError(err)
+	checksumFileName := filepath.Join(input, fmt.Sprintf("%v.sha256sum", hex.EncodeToString(sum)))
+	assert.NoError(fs.Rename(filepath.Join(input, "xxxxxxxx.xxx"), checksumFileName))
+
+	return checksumFileName
 }

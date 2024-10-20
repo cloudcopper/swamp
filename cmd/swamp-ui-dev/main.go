@@ -339,7 +339,7 @@ type FakeStorage struct {
 	fs ports.FS
 }
 
-func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (*ports.NewArtifactInfo, error) {
+func (*FakeStorage) NewArtifact(ports.FS, string, []string, string, models.ArtifactID) (*ports.NewArtifactInfo, error) {
 	panic("not expected to be called atm!!!")
 }
 func (*FakeStorage) RemoveArtifact(string, models.ArtifactID) error {
