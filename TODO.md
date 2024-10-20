@@ -1,8 +1,13 @@
 TODO
 ====
-- artifacts download as separate file or aggregate (.zip)
--- broken artifacts can not be downloaded within single click (figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id)
--- webui marks broken files in artifact as well whole artifact
+- broken artifacts shall not be possible to download within single click/direct url
+-- figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id
+- webui marks broken files in artifact as well whole artifact
+- artifacts download as individual files
+
+- layered fs with afero instead of custom?
+
+- better configuration (atm params dropped here and there and it wont works well with proper DI)
 
 CUSTOM.md - how to customize
 
@@ -30,4 +35,6 @@ CUSTOM.md - how to customize
 - blacklist for meta values - i.e *PASSWORD* should be *************
 
 - gorm -> goent ???
-- uber fx ???
+- uber fx or google wire ???
+
+- archetypes for different artifacts/repos???

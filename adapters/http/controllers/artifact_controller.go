@@ -1,8 +1,14 @@
 package controllers
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"io"
 	"log/slog"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
@@ -30,57 +36,183 @@ func NewArtifactController(log ports.Logger, render infra.Render, artifactReposi
 	return s
 }
 
-func (c *ArtifactController) Index(w http.ResponseWriter, r *http.Request) {
-	errors := []string{}
-	artifacts, err := c.artifactRepository.FindAll()
-	if err != nil {
-		errors = append(errors, err.Error())
-	}
-
-	perPage := 20
-	artifacts, artifactsPage := helperPagination(r, artifacts, perPage)
-
-	data := struct {
-		Errors        []string
-		Artifacts     []*models.Artifact
-		ArtifactsPage int
-	}{
-		Errors:        errors,
-		Artifacts:     artifacts,
-		ArtifactsPage: artifactsPage,
-	}
-
-	c.render.HTML(w, http.StatusOK, "artifacts", data)
-}
-
 func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	repoID := chi.URLParam(r, "repoID")
 	artifactID := chi.URLParam(r, "artifactID")
-
-	errors := []string{}
+	// WARN Reroute - due to problem in go-chi
+	// see also warning in app.go
+	if strings.HasSuffix(artifactID, ".tar.gz") {
+		c.DownloadGzip(w, r)
+		return
+	}
+	if strings.HasSuffix(artifactID, ".zip") {
+		c.DownloadZip(w, r)
+		return
+	}
 
 	artifact, err := c.artifactRepository.FindByID(repoID, artifactID, ports.WithRelationship(true))
-	// TODO What to do if errors.Is(err, gorm.ErrRecordNotFound)??? 404???
-	if err != nil {
-		errors = append(errors, err.Error())
+	if err == ports.ErrRecordNotFound { // 404
+		c.renderArtifactNotFound(w, repoID, artifactID, err)
+		return
 	}
-	// NOTE The files are not in database atm!!!
-	// Should we store those in database?
-	// That would be caching and additional validation for tampering?
-	// Until that the File.Status is always OK(0)
-	files, err := c.aritfactStorage.GetArtifactFiles(artifact.Storage, artifactID)
-	if err != nil {
-		errors = append(errors, err.Error())
+	if err != nil { // 500
+		c.renderServerError(w, repoID, artifactID, err)
+		return
 	}
-	artifact.Files = files
 
 	data := struct {
 		Errors   []string
 		Artifact *viewmodels.Artifact
 	}{
-		Errors:   errors,
+		Errors:   []string{},
 		Artifact: viewmodels.NewArtifact(artifact),
 	}
 
 	c.render.HTML(w, http.StatusOK, "artifact", data)
+}
+
+func (c *ArtifactController) DownloadZip(w http.ResponseWriter, r *http.Request) {
+	repoID := chi.URLParam(r, "repoID")
+	artifactID, _ := strings.CutSuffix(chi.URLParam(r, "artifactID"), ".zip")
+	artifact, err := c.artifactRepository.FindByID(repoID, artifactID, ports.WithRelationship(true))
+	if err == ports.ErrRecordNotFound { // 404
+		c.renderArtifactNotFound(w, repoID, artifactID, err)
+		return
+	}
+	if err != nil { // 500
+		c.renderServerError(w, repoID, artifactID, err)
+		return
+	}
+	if artifact.State.IsBroken() { // 422
+		c.render.HTML(w, http.StatusUnprocessableEntity, "artifact-broken", artifact)
+		return
+	}
+	files := artifact.Files
+
+	// Set headers for zip file
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ID+".zip")
+
+	// Create zip writer directly on the response writer
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	// Loop over the files and add each one to the zip
+	for _, modelFile := range files {
+		fileName := modelFile.Name
+		filePath := filepath.Join(artifact.Storage, fileName)
+		file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+		if err != nil {
+			c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
+			return
+		}
+		defer file.Close()
+
+		// Create a file entry in the zip archive
+		fileWriter, err := zipWriter.Create(fileName)
+		if err != nil {
+			c.renderFileError(w, repoID, artifactID, "create file in zip", filePath, err)
+			return
+		}
+		// Copy the file content into the zip archive
+		if _, err := io.Copy(fileWriter, file); err != nil {
+			c.renderFileError(w, repoID, artifactID, "write file to zip", filePath, err)
+			return
+		}
+	}
+}
+
+func (c *ArtifactController) DownloadGzip(w http.ResponseWriter, r *http.Request) {
+	repoID := chi.URLParam(r, "repoID")
+	artifactID, _ := strings.CutSuffix(chi.URLParam(r, "artifactID"), ".tar.gz")
+	artifact, err := c.artifactRepository.FindByID(repoID, artifactID, ports.WithRelationship(true))
+	if err == ports.ErrRecordNotFound { // 404
+		c.renderArtifactNotFound(w, repoID, artifactID, err)
+		return
+	}
+	if err != nil { // 500
+		c.renderServerError(w, repoID, artifactID, err)
+		return
+	}
+	if artifact.State.IsBroken() { // 422
+		c.render.HTML(w, http.StatusUnprocessableEntity, "artifact-broken", artifact)
+		return
+	}
+	files := artifact.Files
+
+	// Set headers for tar.gz file
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ID+".tar.gz")
+
+	// Create gzip writer directly on the response writer
+	gzipWriter := gzip.NewWriter(w)
+	defer gzipWriter.Close()
+	// Create tar writer inside the gzip writer
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	// Loop over the files and add each one to the tar archive
+	for _, modelFile := range files {
+		fileName := modelFile.Name
+		filePath := filepath.Join(artifact.Storage, fileName)
+		file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+		if err != nil {
+			c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
+			return
+		}
+		defer file.Close()
+
+		// Get file information
+		fileInfo, err := file.Stat()
+		if err != nil {
+			c.renderFileError(w, repoID, artifactID, "stat file", filePath, err)
+			return
+		}
+
+		// Create tar header based on the file info
+		header := &tar.Header{
+			Name: fileName, // TODO Check with nested subdirectories
+			Size: fileInfo.Size(),
+			Mode: int64(fileInfo.Mode()),
+		}
+		if err := tarWriter.WriteHeader(header); err != nil {
+			c.renderFileError(w, repoID, artifactID, "write tar header", filePath, err)
+			return
+		}
+
+		// Copy the file content into the tar archive
+		if _, err := io.Copy(tarWriter, file); err != nil {
+			c.renderFileError(w, repoID, artifactID, "write file to tar", filePath, err)
+			return
+		}
+	}
+}
+
+func (c *ArtifactController) renderArtifactNotFound(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, err error) {
+	type Data struct {
+		RepoID     models.RepoID
+		ArtifactID models.ArtifactID
+		Error      error
+	}
+	c.render.HTML(w, http.StatusNotFound, "artifact-not-found", Data{repoID, artifactID, err})
+}
+
+func (c *ArtifactController) renderServerError(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, err error) {
+	type Data struct {
+		RepoID     models.RepoID
+		ArtifactID models.ArtifactID
+		Error      error
+	}
+	c.render.HTML(w, http.StatusInternalServerError, "artifact-server-error", Data{repoID, artifactID, err})
+}
+
+func (c *ArtifactController) renderFileError(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, op string, filename string, err error) {
+	type Data struct {
+		RepoID     models.RepoID
+		ArtifactID models.ArtifactID
+		Op         string
+		Filename   string
+		Error      error
+	}
+	c.render.HTML(w, http.StatusInternalServerError, "artifact-file-error", Data{repoID, artifactID, op, filename, err})
 }

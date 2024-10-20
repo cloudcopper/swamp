@@ -144,22 +144,22 @@ func (s *ArtifactService) background() {
 	}
 }
 
-func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path string) {
-	log := s.log.With(slog.String("path", path))
+func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, checksumFile string) {
+	log := s.log.With(slog.String("path", checksumFile))
 	log.Debug("detect modified")
 
 	artifactStorage := s.artifactStorage
 
 	for _, repo := range repos {
 		// Check the path belongs to repo
-		if !strings.HasPrefix(path, repo.Input) {
+		if !strings.HasPrefix(checksumFile, repo.Input) {
 			continue
 		}
 		log := log.With(slog.Any("repoID", repo.ID))
 		log.Debug("path match repo")
 
 		// Check the path is a good checksum
-		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, fs, path)
+		checksum, goodFiles, badFiles, err := adapters.CheckChecksum(log, fs, checksumFile)
 		if err == errors.ErrIsNotChecksumFile {
 			continue
 		}
@@ -184,9 +184,30 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path
 			}
 		}
 
+		//  Fill artifact files
+		files := models.ArtifactFiles{}
+		if true {
+			addFile := func(filePath string, state vo.ArtifactState) {
+				fileName := strings.TrimPrefix(strings.TrimPrefix(filePath, repo.Input), string(filepath.Separator))
+				file := &models.ArtifactFile{
+					Name:  fileName,
+					Size:  types.Size(lib.FileSize(fs, filePath)),
+					State: state,
+				}
+				files = append(files, file)
+			}
+			for _, filePath := range goodFiles {
+				addFile(filePath, vo.ArtifactIsOK)
+			}
+			for _, filePath := range badFiles {
+				addFile(filePath, vo.ArtifactIsBroken)
+			}
+			addFile(checksumFile, vo.ArtifactIsOK)
+		}
+
 		// Create new artifacts
-		artifacts := append(goodFiles, path)
-		id := lib.GetFirstSubdir(repo.Input, path)
+		artifacts := append(goodFiles, checksumFile)
+		id := lib.GetFirstSubdir(repo.Input, checksumFile)
 		info, err := artifactStorage.NewArtifact(repo.Input, repo.Storage, id, artifacts)
 		if err != nil {
 			log.Error("unable to create new artifacts", slog.Any("err", err))
@@ -220,10 +241,8 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path
 		meta := models.ArtifactMetas{}
 		for k, v := range metas {
 			meta = append(meta, &models.ArtifactMeta{
-				RepoID:     repo.ID,
-				ArtifactID: info.ID,
-				Key:        k,
-				Value:      v,
+				Key:   k,
+				Value: v,
 			})
 		}
 
@@ -244,6 +263,7 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path
 			ExpiredAt: expiredAt,
 			Checksum:  checksum,
 			Meta:      meta,
+			Files:     files,
 		}
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
 			log.Error("unable create artifact record", slog.Any("artifactID", artifact.ID), slog.Any("err", err))

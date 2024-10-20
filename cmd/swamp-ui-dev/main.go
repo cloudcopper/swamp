@@ -113,7 +113,7 @@ func app(log *slog.Logger) error {
 	}
 	defer closeDb()
 	// Sync database
-	if err := db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta)); err != nil {
+	if err := db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta), new(models.ArtifactFile)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
 		return lib.NewErrorCode(err, errors.RetMigrateDatabaseError)
 	}
@@ -147,6 +147,8 @@ func app(log *slog.Logger) error {
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, fakeStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	router.Get("/repo/{repoID}/artifact/{artifactID}.tar.gz", artifactController.DownloadGzip)
+	router.Get("/repo/{repoID}/artifact/{artifactID}.zip", artifactController.DownloadZip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
 	router.Get("/repo/{repoID}", repoContoller.Get)
 	// Static file handler
@@ -245,16 +247,23 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 			} else {
 				state &= ^vo.ArtifactIsExpired
 			}
+			checksum := genChecksum()
+			files := getArtifactFiles(checksum, createdAt)
+			size := 0
+			for _, f := range files {
+				size += int(f.Size)
+			}
 			artifact := &models.Artifact{
 				RepoID:    repoID,
 				ID:        artifactID,
 				Storage:   repo.Storage,
-				Size:      types.Size(rv([]int{1024, 150 * 1024 * 1024})),
+				Size:      types.Size(size),
 				State:     state,
 				CreatedAt: createdAt,
 				ExpiredAt: expiredAt,
-				Checksum:  genChecksum(),
+				Checksum:  checksum,
 				Meta:      meta,
+				Files:     files,
 			}
 			err := repos.Artifact().Create(artifact)
 			if err != nil {
@@ -286,14 +295,15 @@ func genRepoID(name string, l []int, n []int) string {
 func genChecksum() string {
 	b := rw([]int{10, 20})
 	hash := sha256.New()
-	sum := hash.Sum([]byte(b))
+	_, _ = hash.Write([]byte(b))
+	sum := hash.Sum(nil)
 	return hex.EncodeToString(sum)
 }
 
 func genArtifactID() string {
 	switch rs([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
 	case "hash":
-		return genChecksum()[:64]
+		return genChecksum()
 	case "short-hash":
 		return genChecksum()[:8]
 	case "dirty":
@@ -321,9 +331,12 @@ func genSemver() string {
 	return ""
 }
 
-var fakeStorage = &FakeStorage{}
+var fakeStorage = &FakeStorage{
+	fs: afero.NewMemMapFs(),
+}
 
 type FakeStorage struct {
+	fs ports.FS
 }
 
 func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (*ports.NewArtifactInfo, error) {
@@ -332,7 +345,16 @@ func (*FakeStorage) NewArtifact(string, string, models.ArtifactID, []string) (*p
 func (*FakeStorage) RemoveArtifact(string, models.ArtifactID) error {
 	panic("not expected to be called atm!!!")
 }
-func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.ArtifactFiles, error) {
+func (s *FakeStorage) OpenFile(string, string, string) (ports.File, error) {
+	const name = "/tmp/dump.txt"
+	afero.WriteFile(s.fs, name, []byte(random.Sentences([]int{4, 10})), 0664)
+	f, err := s.fs.Open(name)
+	return f, err
+}
+
+func getArtifactFiles(checksum string, createdAt int64) models.ArtifactFiles {
+	_ = createdAt
+	// Generate artifacts
 	files := models.ArtifactFiles{}
 	for x := 0; x < rv(numFiles); x++ {
 		file := &models.ArtifactFile{
@@ -343,5 +365,24 @@ func (*FakeStorage) GetArtifactFiles(string, models.ArtifactID) (models.Artifact
 		files = append(files, file)
 	}
 
-	return files, nil
+	// Generate _export.txt
+	files = append(files, &models.ArtifactFile{
+		Name:  "_export.txt",
+		Size:  types.Size(rv([]int{1024, 4096})),
+		State: vo.ArtifactIsOK,
+	})
+	// Generate _createdAt.txt
+	files = append(files, &models.ArtifactFile{
+		Name:  "_createdAt.txt",
+		Size:  types.Size(rv([]int{32, 64})),
+		State: vo.ArtifactIsOK,
+	})
+	// Generate checksum file
+	files = append(files, &models.ArtifactFile{
+		Name:  checksum + ".sha256sum",
+		Size:  types.Size(rv([]int{128, 1024})),
+		State: vo.ArtifactIsOK,
+	})
+
+	return files
 }

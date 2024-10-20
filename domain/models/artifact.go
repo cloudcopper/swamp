@@ -26,7 +26,7 @@ type Artifact struct {
 	ExpiredAt int64            `gorm:"index;column:expired_at" validate:"required,gt=0"` // UTC Unix time at which the artifacts expires
 	Checksum  string           `gorm:"not null" validate:"required,min=8"`
 	Meta      ArtifactMetas    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
-	Files     ArtifactFiles    `gorm:"-" valudate:"-"`
+	Files     ArtifactFiles    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" valudate:"-"`
 }
 
 func (model *Artifact) Validate(validator *validator.Validate) error {
@@ -45,12 +45,31 @@ func (model *Artifact) Validate(validator *validator.Validate) error {
 	}
 
 	for _, m := range model.Meta {
+		if m.RepoID == "" {
+			m.RepoID = model.RepoID
+		}
+		if m.RepoID != model.RepoID {
+			return errors.ErrIncorrectMetaID
+		}
 		if m.ArtifactID == "" {
 			m.ArtifactID = model.ID
-			continue
 		}
 		if m.ArtifactID != model.ID {
 			return errors.ErrIncorrectMetaID
+		}
+	}
+	for _, f := range model.Files {
+		if f.RepoID == "" {
+			f.RepoID = model.RepoID
+		}
+		if f.RepoID != model.RepoID {
+			return errors.ErrIncorrectFileID
+		}
+		if f.ArtifactID == "" {
+			f.ArtifactID = model.ID
+		}
+		if f.ArtifactID != model.ID {
+			return errors.ErrIncorrectFileID
 		}
 	}
 

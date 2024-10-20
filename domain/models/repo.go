@@ -19,8 +19,8 @@ type Repo struct {
 	Retention   types.Duration `gorm:"int64" validate:"min=0"`
 	Broken      string         `gorm:"string" validate:"omitempty,min=3,eq=/dev/null|dir,abspath,nefield=Input,nefield=Storage"`
 	Size        types.Size     `gorm:"int64" validate:"min=0"`
-	Meta        RepoMetas      `gorm:"foreignKey:RepoID" validate:"-"`
-	Artifacts   Artifacts      `gorm:"foreignKey:RepoID" yaml:"-" validate:"-"`
+	Meta        RepoMetas      `gorm:"foreignKey:RepoID;constraint:OnDelete:CASCADE;" validate:"-"`
+	Artifacts   Artifacts      `gorm:"foreignKey:RepoID;constraint:OnDelete:CASCADE;" yaml:"-" validate:"-"`
 }
 
 func (model *Repo) Validate(validator *validator.Validate) error {

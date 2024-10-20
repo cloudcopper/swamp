@@ -54,6 +54,9 @@ func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
 				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
 					return db.Order("created_at DESC")
 				})
+				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
+				})
 			}
 		}
 	}
@@ -82,6 +85,9 @@ func (r *RepoRepository) FindByID(id models.RepoID, flags ...interface{}) (*mode
 				})
 				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
 					return db.Order("key ASC")
+				})
+				db = db.Preload("Artifacts.Files", func(db ports.DB) ports.DB {
+					return db.Order("name ASC")
 				})
 			}
 		}

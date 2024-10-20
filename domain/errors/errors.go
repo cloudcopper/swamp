@@ -13,6 +13,7 @@ const ErrIsNotChecksumFile = lib.Error("is not checksum file")
 const ErrUnsecureFileName = lib.Error("unsecure file name")
 const ErrArtifactIsBroken = lib.Error("artifact is broken")
 const ErrIncorrectMetaID = lib.Error("incorrect meta id")
+const ErrIncorrectFileID = lib.Error("incorrect file id")
 
 type ErrArtifactAlreadyExists struct {
 	Path string

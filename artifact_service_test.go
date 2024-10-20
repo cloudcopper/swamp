@@ -73,7 +73,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		// - Create one artifact (in repo2)
 		//
 
-		// Create input artifact files
+		// Create input artifact files - five(5) files - four(4) artifacts + checksum file
 		creationTime := time.Now().UTC().Unix()
 		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file1.bin"), random.ByteSlice(32*1024), 0644))
 		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file2.bin"), random.ByteSlice(64*1024), 0644))
@@ -113,6 +113,10 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		metas = models.ArtifactMetas{}
 		assert.NoError(db.Find(&metas).Error)
 		assert.Empty(metas)
+		// ...no artifact files exists
+		var files models.ArtifactFiles
+		assert.NoError(db.Find(&files).Error)
+		assert.Empty(files)
 
 		//
 		// Signal to artifact serivce to check the checksum file
@@ -130,13 +134,16 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.False(lib.First(afero.Exists(fs, filepath.Join(input, "_createdAt.txt"))))
 		assert.False(lib.First(afero.Exists(fs, checksumFileName)))
 
+		// TODO Check access over artifact storage
+		_ = st
+
 		// ...repoModel properly updated
 		repoModel, err = rr.FindByID(testRepoID, ports.WithRelationship(true))
 		assert.NoError(err)
 		assert.NotNil(repoModel)
 		assert.Equal(testRepoID, repoModel.ID)
-		assert.Len(repoModel.Artifacts, 1)
 		assert.NotZero(repoModel.Size)
+		assert.Len(repoModel.Artifacts, 1)
 
 		// ...artifactModel propely created
 		artifactModel := repoModel.Artifacts[0]
@@ -145,10 +152,16 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.Equal(vo.ArtifactIsOK, artifactModel.State)
 		// ...and has meta from _export.txt
 		assert.NotEmpty(artifactModel.Meta)
+		// ...artifact has files
+		assert.Len(artifactModel.Files, 5)
 		// ...artifact metas updated
 		metas = models.ArtifactMetas{}
 		assert.NoError(db.Find(&metas).Error)
 		assert.NotEmpty(metas)
+		// ...artifact files updated
+		files = models.ArtifactFiles{}
+		assert.NoError(db.Find(&files).Error)
+		assert.Len(files, 5)
 
 		// ...storage has artifacts
 		storedArtifactPath := filepath.Join(storage, artifactModel.ID)
@@ -160,9 +173,11 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, fileName))))
 
 		// ...and has five(5) files as test created
-		files, err := st.GetArtifactFiles(repoModel.Storage, artifactModel.ID)
+		/* TODO Change it!!
+		files, err = st.GetArtifactFiles(repoModel.Storage, artifactModel.ID)
 		assert.NoError(err)
 		assert.Len(files, 5)
+		*/
 
 		//
 		// - Expire it
@@ -202,6 +217,10 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		metas = models.ArtifactMetas{}
 		assert.NoError(db.Find(&metas).Error)
 		assert.Empty(metas)
+		// ...artifact files shall be empty (we removed last artifact)
+		files = models.ArtifactFiles{}
+		assert.NoError(db.Find(&files).Error)
+		assert.Empty(files)
 
 		// Check files are removed
 		exist, err := afero.DirExists(fs, storedArtifactPath)

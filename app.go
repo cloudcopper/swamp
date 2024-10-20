@@ -60,7 +60,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	}
 	defer closeDb()
 	// Sync database
-	if err := db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta)); err != nil {
+	if err := db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta), new(models.ArtifactFile)); err != nil {
 		log.Error("unable sync database", slog.Any("err", err), slog.String("driver", driver), slog.String("source", source))
 		return lib.NewErrorCode(err, errors.RetMigrateDatabaseError)
 	}
@@ -122,6 +122,12 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, artifactStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	// WARN Next two routes are more like documentation as those are not working
+	// Please see https://github.com/go-chi/chi/issues/758 and related
+	// So the artifactController.GetHandler would handle calling proper handled
+	// base on suffix
+	router.Get("/repo/{repoID}/artifact/{artifactID}.tar.gz", artifactController.DownloadGzip)
+	router.Get("/repo/{repoID}/artifact/{artifactID}.zip", artifactController.DownloadZip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
 	router.Get("/repo/{repoID}", repoContoller.Get)
 	// Static file handler

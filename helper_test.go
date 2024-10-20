@@ -49,7 +49,7 @@ func testFakeApp(t *testing.T, fs afero.Fs, repos []*models.Repo, callback func(
 	db, closeDb, err := infra.NewDatabase(log, driver, source)
 	noErr(err)
 	defer closeDb()
-	noErr(db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta)))
+	noErr(db.AutoMigrate(new(models.Repo), new(models.RepoMeta), new(models.Artifact), new(models.ArtifactMeta), new(models.ArtifactFiles)))
 	// Create repos repository
 	repoRepository, err := repository.NewRepoRepository(db, fs)
 	noErr(err)

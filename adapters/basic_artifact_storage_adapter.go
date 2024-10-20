@@ -5,17 +5,13 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cloudcopper/swamp/domain/errors"
 	"github.com/cloudcopper/swamp/domain/models"
-	"github.com/cloudcopper/swamp/domain/vo"
-	"github.com/cloudcopper/swamp/infra/disk"
 	"github.com/cloudcopper/swamp/lib"
-	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/oklog/ulid/v2"
 	"github.com/spf13/afero"
@@ -119,74 +115,16 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(input string, storage string, 
 	return info, nil
 }
 
-func (s *BasicArtifactStorageAdapter) GetArtifactFiles(storage string, artifactID models.ArtifactID) (models.ArtifactFiles, error) {
-	log, fs := s.log, s.fs
-
-	exist, _ := afero.DirExists(fs, storage)
-	if !exist {
-		log.Error("storage not found", slog.String("storage", storage))
-		return nil, lib.ErrNoSuchDirectory{Path: storage}
-	}
-	path := filepath.Join(storage, artifactID)
-	exist, _ = afero.DirExists(fs, path)
-	if !exist {
-		log.Error("artifact not found", slog.String("path", path))
-		return nil, lib.ErrNoSuchDirectory{Path: path}
-	}
-
-	files := models.ArtifactFiles{}
-	w := disk.NewFilepathWalk(fs)
-	w.Walk(path, func(name string, err error) (bool, error) {
-		if err != nil {
-			log.Error("filepath walk failed", slog.String("path", path), slog.Any("err", err))
-			return true, err
-		}
-		lib.Assert(strings.HasPrefix(name, path))
-		if name == path {
-			return true, nil
-		}
-		files = append(files, &models.ArtifactFile{
-			Name:  name,
-			Size:  types.Size(lib.FileSize(fs, name)),
-			State: vo.ArtifactIsOK, // TODO Ideally we would have to check the checksum somehow here
-		})
-		return true, nil
-	})
-
-	slices.SortFunc(files, func(a, b *models.ArtifactFile) int {
-		s := []string{
-			strings.TrimPrefix(a.Name, path+string(filepath.Separator)),
-			strings.TrimPrefix(b.Name, path+string(filepath.Separator)),
-		}
-		for i := range s {
-			if strings.HasPrefix(s[i], "_created") {
-				s[i] = "zzzz" + s[i]
-			} else if s[i][0] == '_' {
-				s[i] = "zzz" + s[i]
-			}
-			if strings.HasSuffix(s[i], ".md5") {
-				s[i] = "zzzzzz" + s[i]
-			}
-			if strings.HasSuffix(s[i], ".sha256sum") {
-				s[i] = "zzzzzzz" + s[i]
-			}
-		}
-
-		if s[0] > s[1] {
-			return 1
-		}
-		if s[0] < s[1] {
-			return -1
-		}
-		return 0
-	})
-	return files, nil
-}
-
 func (s *BasicArtifactStorageAdapter) RemoveArtifact(storage string, artifactID models.ArtifactID) error {
 	path := filepath.Join(storage, artifactID)
 	err := s.fs.RemoveAll(path)
 	return err
+}
+
+func (s *BasicArtifactStorageAdapter) OpenFile(storage string, artifactID models.ArtifactID, filename string) (ports.File, error) {
+	path := filepath.Join(storage, artifactID, filename)
+	f, err := s.fs.OpenFile(path, os.O_RDONLY, 0)
+	return f, err
 }
 
 func (s *BasicArtifactStorageAdapter) Close() {

@@ -68,6 +68,9 @@ func (r *ArtifactRepository) FindAll() ([]*models.Artifact, error) {
 	var artifacts []*models.Artifact
 	db := r.db
 	db = db.Order("created_at DESC")
+	db = db.Preload("Meta", func(db ports.DB) ports.DB {
+		return db.Order("key DESC")
+	})
 	err := db.Find(&artifacts).Error
 	return artifacts, err
 }
@@ -83,11 +86,13 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 				db = db.Preload("Meta", func(db ports.DB) ports.DB {
 					return db.Order("key DESC")
 				})
+				db = db.Preload("Files")
 			}
 		}
 	}
 
 	err := db.First(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
+	artifact.Files.Sort(artifact.Storage)
 	return artifact, err
 }
 
