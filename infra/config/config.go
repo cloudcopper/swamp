@@ -5,12 +5,12 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	tpl "github.com/cloudcopper/misc/env/template"
 	"github.com/cloudcopper/swamp/domain/models"
+	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
 
 	"gopkg.in/yaml.v3"
@@ -103,7 +103,6 @@ func processReposConfigs(log ports.Logger, config *Config) *Config {
 	ret := &Config{
 		Repos: make(map[string]models.Repo),
 	}
-	reValidID := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9\-\_\.]{2,}$`)
 
 	for k, v := range config.Repos {
 		log := log.With(slog.String("configID", k))
@@ -120,7 +119,7 @@ func processReposConfigs(log ports.Logger, config *Config) *Config {
 		}
 		v.ID = strings.ReplaceAll(string(v.ID), refRepoID, k)
 		log = log.With(slog.Any("repoID", v.ID))
-		if !reValidID.MatchString(string(v.ID)) {
+		if !lib.IsValidID(string(v.ID)) {
 			log.Error("skip - invalid repo id")
 			continue
 		}
@@ -147,8 +146,55 @@ func processReposConfigs(log ports.Logger, config *Config) *Config {
 		ret.Repos[k] = v
 	}
 
-	// TODO Check multiple repos has same input
-	// TODO Check multiple repos has same storage
+	// Check multiple repos has same input/storage
+	ret.Repos = removeSameRepos(log, ret.Repos)
 
 	return ret
+}
+
+func removeSameRepos(log ports.Logger, in map[string]models.Repo) map[string]models.Repo {
+	out := map[string]models.Repo{}
+
+	isNested := func(a, b string) bool {
+		if !strings.HasSuffix(a, "/") {
+			a += "/"
+		}
+		if !strings.HasSuffix(b, "/") {
+			b += "/"
+		}
+		return strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
+	}
+
+	for k1, v1 := range in {
+		isDup := false
+
+		for k2, v2 := range in {
+			if k1 == k2 {
+				continue
+			}
+			if v1.Input == v2.Input {
+				isDup = true
+				log.Error("duplicated config detected", slog.Any("repoID", k1), slog.Any("input", v1.Input))
+			} else if v1.Storage == v2.Storage {
+				isDup = true
+				log.Error("duplicated config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
+			} else if isNested(v1.Storage, v2.Storage) {
+				isDup = true
+				log.Error("nested config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
+			} else if isNested(v1.Input, v2.Input) {
+				isDup = true
+				log.Error("nested config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
+			}
+			if isDup {
+				break
+			}
+		}
+
+		if isDup {
+			continue
+		}
+		out[k1] = v1
+	}
+
+	return out
 }
