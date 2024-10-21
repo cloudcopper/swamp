@@ -61,10 +61,8 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Errors   []string
 		Artifact *viewmodels.Artifact
 	}{
-		Errors:   []string{},
 		Artifact: viewmodels.NewArtifact(artifact),
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
+	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/go-chi/chi/v5"
@@ -30,19 +31,37 @@ func NewRepoController(log ports.Logger, render infra.Render, repoRepository dom
 func (c *RepoController) Get(w http.ResponseWriter, r *http.Request) {
 	repoID := chi.URLParam(r, "repoID")
 
-	errors := []string{}
 	repo, err := c.repoRepository.FindByID(repoID, ports.WithRelationship(true))
-	if err != nil {
-		errors = append(errors, err.Error())
+	if err == ports.ErrRecordNotFound { // 404
+		c.renderRepoNotFound(w, repoID, err)
+		return
+	}
+	if err != nil { // 500
+		c.renderServerError(w, repoID, err)
+		return
 	}
 
 	data := struct {
-		Errors []string
-		Repo   *viewmodels.Repo
+		Repo *viewmodels.Repo
 	}{
-		Errors: errors,
-		Repo:   viewmodels.NewRepo(repo),
+		Repo: viewmodels.NewRepo(repo),
 	}
 
 	c.render.HTML(w, http.StatusOK, "repo", data)
+}
+
+func (c *RepoController) renderRepoNotFound(w http.ResponseWriter, repoID models.RepoID, err error) {
+	type Data struct {
+		RepoID models.RepoID
+		Error  error
+	}
+	c.render.HTML(w, http.StatusNotFound, "repo-not-found", Data{repoID, err})
+}
+
+func (c *RepoController) renderServerError(w http.ResponseWriter, repoID models.RepoID, err error) {
+	type Data struct {
+		RepoID models.RepoID
+		Error  error
+	}
+	c.render.HTML(w, http.StatusInternalServerError, "repo-server-error", Data{repoID, err})
 }
