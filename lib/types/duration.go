@@ -33,15 +33,15 @@ func (d Duration) String() string {
 
 	s = ""
 	if y := h / (365 * 24); y != 0 {
-		h = h % (365 * 24)
+		h %= (365 * 24)
 		s += fmt.Sprintf("%vy", y)
 	}
 	if m := h / (30 * 24); m != 0 {
-		h = h % (30 * 24)
+		h %= (30 * 24)
 		s += fmt.Sprintf("%vM", m)
 	}
 	if w := h / (7 * 24); w != 0 {
-		h = h % (7 * 24)
+		h %= (7 * 24)
 		s += fmt.Sprintf("%vw", w)
 	}
 	if h != 0 {
@@ -94,7 +94,7 @@ func ParseDuration(s string) (Duration, error) {
 			if err != nil {
 				return 0, err
 			}
-			v = v + int64(a)
+			v += int64(a)
 			break
 		}
 

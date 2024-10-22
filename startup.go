@@ -10,15 +10,15 @@ import (
 	"github.com/cloudcopper/swamp/ports"
 )
 
-func startup(log ports.Logger, config *config.Config, bus ports.EventBus, repoRepository domain.RepoRepository) error {
+func startup(log ports.Logger, cfg *config.Config, bus ports.EventBus, repoRepository domain.RepoRepository) error {
 	//
 	// Create repo models
 	//
-	for k, repo := range config.Repos {
+	for k, repo := range cfg.Repos {
 		log := log.With(slog.String("config", k), slog.Any("repoID", repo.ID))
 
 		// Create repo model in repository
-		if err := repoRepository.Create(&repo); err != nil {
+		if err := repoRepository.Create(repo); err != nil {
 			log.Error("unable create repo record", slog.Any("err", err))
 			return lib.NewErrorCode(err, errors.RetCreateRepoRecordError)
 		}

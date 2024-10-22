@@ -23,8 +23,8 @@ type Repo struct {
 	Artifacts   Artifacts      `gorm:"foreignKey:RepoID;constraint:OnDelete:CASCADE;" yaml:"-" validate:"-"`
 }
 
-func (model *Repo) Validate(validator *validator.Validate) error {
-	err := validator.Struct(model)
+func (model *Repo) Validate(val *validator.Validate) error {
+	err := val.Struct(model)
 	if err != nil {
 		return err
 	}

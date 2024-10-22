@@ -17,11 +17,11 @@ type ArtifactRepository struct {
 	validator *validator.Validate
 }
 
-func NewArtifactRepository(db ports.DB, fs ports.FS) (*ArtifactRepository, error) {
+func NewArtifactRepository(db ports.DB, f ports.FS) (*ArtifactRepository, error) {
 	r := &ArtifactRepository{
 		db:        db,
-		fs:        fs,
-		validator: lib.NewValidator(fs),
+		fs:        f,
+		validator: lib.NewValidator(f),
 	}
 	_, err := r.FindAll()
 	return r, err
@@ -82,12 +82,15 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 	for _, flag := range flags {
 		switch v := flag.(type) {
 		case ports.WithRelationship:
-			if v {
-				db = db.Preload("Meta", func(db ports.DB) ports.DB {
-					return db.Order("key DESC")
-				})
-				db = db.Preload("Files")
+			if !v {
+				continue
 			}
+			db = db.Preload("Meta", func(db ports.DB) ports.DB {
+				return db.Order("key DESC")
+			})
+			db = db.Preload("Files")
+		default:
+			panic(flag)
 		}
 	}
 
@@ -124,6 +127,8 @@ func (r *ArtifactRepository) FindAllStatusExpired(flags ...interface{}) ([]*mode
 		switch v := flag.(type) {
 		case ports.Limit:
 			db = db.Limit(int(v))
+		default:
+			panic(flag)
 		}
 	}
 
@@ -151,6 +156,8 @@ func (r *ArtifactRepository) FindAllStatusBroken(flags ...interface{}) ([]*model
 		switch v := flag.(type) {
 		case ports.Limit:
 			db = db.Limit(int(v))
+		default:
+			panic(flag)
 		}
 	}
 

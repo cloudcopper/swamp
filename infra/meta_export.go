@@ -11,9 +11,9 @@ import (
 type MetaExport struct {
 }
 
-func (*MetaExport) ParseMetaFile(fs ports.FS, filename string) (map[string]string, error) {
+func (*MetaExport) ParseMetaFile(f ports.FS, filename string) (map[string]string, error) {
 	// Read whole file
-	data, err := afero.ReadFile(fs, filename)
+	data, err := afero.ReadFile(f, filename)
 	if err != nil {
 		return nil, err
 	}

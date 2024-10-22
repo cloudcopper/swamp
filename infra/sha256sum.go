@@ -19,8 +19,8 @@ type Sha256 struct {
 }
 
 // Sum return checksum of given file or error
-func (s *Sha256) Sum(fs ports.FS, fileName string) ([]byte, error) {
-	file, err := fs.Open(fileName)
+func (s *Sha256) Sum(f ports.FS, fileName string) ([]byte, error) {
+	file, err := f.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -35,15 +35,15 @@ func (s *Sha256) Sum(fs ports.FS, fileName string) ([]byte, error) {
 	return hash.Sum(nil), nil
 }
 
-// CheckFiles return list of good files, list of bad files as specified by checksumFileName
+// CheckFiles return list of good/bad files as specified by checksumFileName
 // or first error. Files must be returned with abs path
-func (s *Sha256) CheckFiles(fs ports.FS, checksumFileName string) ([]string, []string, error) {
-	goodFiles, badFiles := []string{}, []string{}
+func (s *Sha256) CheckFiles(f ports.FS, checksumFileName string) (ports.CheckedFiles, error) {
+	files := ports.CheckedFiles{}
 	dir := filepath.Dir(checksumFileName)
 
-	file, err := fs.Open(checksumFileName)
+	file, err := f.Open(checksumFileName)
 	if err != nil {
-		return goodFiles, badFiles, err
+		return files, err
 	}
 	defer file.Close()
 
@@ -56,39 +56,39 @@ func (s *Sha256) CheckFiles(fs ports.FS, checksumFileName string) ([]string, []s
 		}
 		a := strings.Fields(line)
 		if len(a) != 2 {
-			badFiles = append(badFiles, line)
+			files.Bad = append(files.Bad, line)
 			continue
 		}
 		checksum, fileName := a[0], a[1]
 		if !lib.IsSecureFileName(fileName) {
 			err = errors.ErrUnsecureFileName
-			badFiles = append(badFiles, fileName)
-			return goodFiles, badFiles, err
+			files.Bad = append(files.Bad, fileName)
+			return files, err
 		}
 		fileName = path.Join(dir, fileName)
 		fileName, err = filepath.Abs(fileName)
 		if err != nil {
-			badFiles = append(badFiles, fileName)
-			return goodFiles, badFiles, err
+			files.Bad = append(files.Bad, fileName)
+			return files, err
 		}
 
-		sum, err := s.Sum(fs, fileName)
+		sum, err := s.Sum(f, fileName)
 		if err != nil {
-			badFiles = append(badFiles, fileName)
-			return goodFiles, badFiles, err
+			files.Bad = append(files.Bad, fileName)
+			return files, err
 		}
 		if checksum != hex.EncodeToString(sum) {
-			badFiles = append(badFiles, fileName)
+			files.Bad = append(files.Bad, fileName)
 			continue
 		}
-		goodFiles = append(goodFiles, fileName)
+		files.Good = append(files.Good, fileName)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return goodFiles, badFiles, err
+		return files, err
 	}
 
-	return goodFiles, badFiles, err
+	return files, err
 }
 
 func init() {

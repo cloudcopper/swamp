@@ -10,8 +10,8 @@ func Word() string {
 
 func Words(r []int) string {
 	name := ""
-	max := Value(r)
-	for x := 0; x < max; x++ {
+	n := Value(r)
+	for x := 0; x < n; x++ {
 		if x != 0 {
 			name += " "
 		}

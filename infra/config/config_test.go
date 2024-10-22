@@ -11,12 +11,12 @@ import (
 func TestRemoveSameRepos(t *testing.T) {
 	testCases := []struct {
 		desc string
-		in   map[string]models.Repo
-		out  map[string]models.Repo
+		in   map[string]*models.Repo
+		out  map[string]*models.Repo
 	}{
 		{
 			desc: "well configured",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo1",
 					Storage: "/storage/repo1",
@@ -30,7 +30,7 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo3",
 				},
 			},
-			out: map[string]models.Repo{
+			out: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo1",
 					Storage: "/storage/repo1",
@@ -47,7 +47,7 @@ func TestRemoveSameRepos(t *testing.T) {
 		},
 		{
 			desc: "two input dups",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo",
 					Storage: "/storage/repo1",
@@ -57,11 +57,11 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo2",
 				},
 			},
-			out: map[string]models.Repo{},
+			out: map[string]*models.Repo{},
 		},
 		{
 			desc: "two storage dups",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo1",
 					Storage: "/storage/repo",
@@ -71,11 +71,11 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo",
 				},
 			},
-			out: map[string]models.Repo{},
+			out: map[string]*models.Repo{},
 		},
 		{
 			desc: "overlapped dups",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo",
 					Storage: "/storage/repo1",
@@ -89,11 +89,11 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo",
 				},
 			},
-			out: map[string]models.Repo{},
+			out: map[string]*models.Repo{},
 		},
 		{
 			desc: "only one normal",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo",
 					Storage: "/storage/repo",
@@ -107,7 +107,7 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo3",
 				},
 			},
-			out: map[string]models.Repo{
+			out: map[string]*models.Repo{
 				"repo3": {
 					Input:   "/input/repo3",
 					Storage: "/storage/repo3",
@@ -116,7 +116,7 @@ func TestRemoveSameRepos(t *testing.T) {
 		},
 		{
 			desc: "two nested",
-			in: map[string]models.Repo{
+			in: map[string]*models.Repo{
 				"repo1": {
 					Input:   "/input/repo/repo1",
 					Storage: "/storage/repo1",
@@ -130,7 +130,7 @@ func TestRemoveSameRepos(t *testing.T) {
 					Storage: "/storage/repo3",
 				},
 			},
-			out: map[string]models.Repo{
+			out: map[string]*models.Repo{
 				"repo3": {
 					Input:   "/input/repo3",
 					Storage: "/storage/repo3",

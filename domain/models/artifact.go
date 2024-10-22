@@ -29,8 +29,8 @@ type Artifact struct {
 	Files     ArtifactFiles    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" valudate:"-"`
 }
 
-func (model *Artifact) Validate(validator *validator.Validate) error {
-	err := validator.Struct(model)
+func (model *Artifact) Validate(val *validator.Validate) error {
+	err := val.Struct(model)
 	if err != nil {
 		return err
 	}

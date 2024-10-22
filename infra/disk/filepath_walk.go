@@ -12,8 +12,8 @@ type FilepathWalk struct {
 	fs ports.FS
 }
 
-func NewFilepathWalk(fs ports.FS) FilepathWalk {
-	return FilepathWalk{fs}
+func NewFilepathWalk(f ports.FS) FilepathWalk {
+	return FilepathWalk{f}
 }
 
 func (f *FilepathWalk) Walk(root string, fn func(name string, err error) (bool, error)) error {

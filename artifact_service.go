@@ -1,6 +1,7 @@
 package swamp
 
 import (
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -33,7 +34,8 @@ type ArtifactService struct {
 	bus                         ports.EventBus
 	artifactStorage             ports.ArtifactStorage
 	repositories                domain.Repositories
-	fs                          ports.FS
+	storageFs                   ports.FS
+	brokenFs                    ports.FS
 	chTopicRepoUpdated          chan ports.Event
 	chTopicInputFileModified    chan ports.Event
 	chTopicDanglingRepoArtifact chan ports.Event
@@ -52,7 +54,7 @@ func NewArtifactService(log ports.Logger, bus ports.EventBus, artifactStorage po
 		bus:                         bus,
 		artifactStorage:             artifactStorage,
 		repositories:                repositories,
-		fs:                          afero.NewOsFs(),
+		storageFs:                   afero.NewOsFs(),
 		chTopicRepoUpdated:          bus.Sub(ports.TopicRepoUpdated),
 		chTopicInputFileModified:    bus.Sub(ports.TopicInputFileModified),
 		chTopicDanglingRepoArtifact: bus.Sub(ports.TopicDanglingRepoArtifact),
@@ -94,8 +96,6 @@ func (s *ArtifactService) background() {
 	defer timerBroken.Stop()
 	knownArtifacts := []*models.Artifact{}
 
-	fs := s.fs
-
 	for {
 		select {
 		case event, ok := <-s.chTopicRepoUpdated:
@@ -115,7 +115,8 @@ func (s *ArtifactService) background() {
 			path := event[0]
 			// TODO Can watcher run over ports.FS?
 			// TODO Should we change watcher to some poll/scan mode watcher which would ran well over ports.FS?
-			s.checkInputFile(repos, fs, path)
+			// TODO Event should have inputFS!!!
+			s.checkInputFile(repos, s.storageFs, path)
 		case event, ok := <-s.chTopicDanglingRepoArtifact:
 			if !ok {
 				return
@@ -154,43 +155,43 @@ func (s *ArtifactService) background() {
 // The repos has all known cached atm repo definitions.
 // The fs is a file system where the even was detected.
 // The path is the full path of changes detected.
-func (s *ArtifactService) checkInputFile(repos []*models.Repo, fs ports.FS, path string) error {
+func (s *ArtifactService) checkInputFile(repos []*models.Repo, f ports.FS, path string) error {
 	for _, repo := range repos {
 		if strings.HasPrefix(path, repo.Input) { // Check the path belongs to repo.Input
-			return s.checkRepoInput(repo, fs, path)
+			return s.checkRepoInput(repo, f, path)
 		}
 	}
 	return errors.ErrNotMatchRepoInput
 }
-func (s *ArtifactService) checkRepoInput(repo *models.Repo, fs ports.FS, checksumFile string) error {
+func (s *ArtifactService) checkRepoInput(repo *models.Repo, f ports.FS, checksumFile string) error {
 	log := s.log.With(slog.Any("checksumFile", checksumFile), slog.Any("repoID", repo.ID))
 
 	// Check the path is a good checksum
-	da := checksumDiskArtifact(log, fs, checksumFile)
+	da := checksumDiskArtifact(log, f, checksumFile)
 	if da.checksumError != nil {
 		return da.checksumError
 	}
-	log.Info("checksum file verified", slog.Any("goodFiles", da.goodFiles))
+	log.Info("checksum file verified", slog.Any("files.Good", da.files.Good))
 
 	// get artifact meta and files
 	meta := da.getArtifactMeta(log)
 	files := da.getArtifactFiles(log)
 
 	// Create new artifacts
-	artifacts := da.goodFiles
+	artifacts := da.files.Good
 	artifactID := lib.GetFirstSubdir(repo.Input, da.checksumFile)
 	if artifactID == "" {
 		artifactID = ulid.Make().String()
 	}
 	log.Info("new artifact", slog.Any("artifactID", artifactID))
 
-	info, err := s.artifactStorage.NewArtifact(fs, repo.Input, artifacts, repo.Storage, artifactID)
+	info, err := s.artifactStorage.NewArtifact(f, repo.Input, artifacts, repo.Storage, artifactID)
 	if err != nil {
 		log.Error("unable to create new artifacts", slog.Any("err", err))
 	}
 
 	// Cleanup input artifacts
-	cleanInputArtifacts(log, fs, repo.Input, artifacts)
+	cleanInputArtifacts(log, f, repo.Input, artifacts)
 
 	// Insert artifact record
 	createdAt := info.CreatedAt
@@ -204,7 +205,7 @@ func (s *ArtifactService) checkRepoInput(repo *models.Repo, fs ports.FS, checksu
 		State:     state,
 		CreatedAt: info.CreatedAt,
 		ExpiredAt: expiredAt,
-		Checksum:  da.checksum,
+		Checksum:  string(da.checksum),
 		Meta:      meta,
 		Files:     files,
 	}
@@ -226,7 +227,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 	}
 
 	loc := filepath.Join(repo.Storage, artifactID)
-	da, err := s.verifyArtifactLocation(s.fs, loc) // @checkRepoArtifact
+	da, err := s.verifyArtifactLocation(loc)
 	if err != nil {
 		log.Error("unable to verify aritfact", slog.Any("err", err))
 		s.bus.Pub(ports.TopicBrokenRepoArtifact, ports.Event{repoID, artifactID})
@@ -255,7 +256,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 			RepoID:    repoID,
 			Storage:   repo.Storage,
 			Size:      types.Size(da.size),
-			Checksum:  da.checksum,
+			Checksum:  string(da.checksum),
 			State:     state,
 			CreatedAt: da.createdAt,
 			ExpiredAt: expiredAt,
@@ -291,27 +292,27 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 }
 
 // The verifyArtifactLocation check the location artifact files
-func (s *ArtifactService) verifyArtifactLocation(fs ports.FS, location string) (*diskArtifact, error) {
-	log, fs := s.log, s.fs
+func (s *ArtifactService) verifyArtifactLocation(location string) (*diskArtifact, error) {
+	log, f := s.log, s.storageFs
 
 	// Scan disk artifact
-	da := walkDiskArtifact(log, fs, location)
+	da := walkDiskArtifact(log, f, location)
 
 	// Verify artifact state
 	if da.checksumError != nil {
 		log.Error("unable to checksum artifact", slog.String("checksumFile", da.checksumFile), slog.Any("err", da.checksumError))
 		return da, errors.ErrArtifactIsBroken
 	}
-	if len(da.badFiles) > 0 {
-		log.Error("bad files detected", slog.String("checksumFile", da.checksumFile), slog.Any("badFiles", da.badFiles))
+	if len(da.files.Bad) > 0 {
+		log.Error("bad files detected", slog.String("checksumFile", da.checksumFile), slog.Any("files.Bad", da.files.Bad))
 		return da, errors.ErrArtifactIsBroken
 	}
-	if len(da.goodFiles) != len(da.allFiles) {
-		log.Error("missmatch between good and actual files", slog.Any("goodFiles", da.goodFiles), slog.Any("files", da.allFiles))
+	if len(da.files.Good) != len(da.allFiles) {
+		log.Error("missmatch between good and actual files", slog.Any("files.Good", da.files.Good), slog.Any("files", da.allFiles))
 		return da, errors.ErrArtifactIsBroken
 	}
-	if slices.Compare(da.goodFiles, da.allFiles) != 0 {
-		log.Error("different files listed in good and actual files", slog.Any("goodFiles", da.goodFiles), slog.Any("files", da.allFiles))
+	if slices.Compare(da.files.Good, da.allFiles) != 0 {
+		log.Error("different files listed in good and actual files", slog.Any("files.Good", da.files.Good), slog.Any("files", da.allFiles))
 		return da, errors.ErrArtifactIsBroken
 	}
 
@@ -382,7 +383,7 @@ func (s *ArtifactService) checkBrokenArtifacts(limit int, artifacts []*models.Ar
 func (s *ArtifactService) checkBrokenArtifact(artifact *models.Artifact) {
 	log := s.log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
 	loc := filepath.Join(artifact.Storage, artifact.ID)
-	da, err := s.verifyArtifactLocation(s.fs, loc) // @checkBrokenArtifact
+	da, err := s.verifyArtifactLocation(loc)
 	is_broken := false
 	if err != nil {
 		log.Error("unable verify artifact", slog.Any("err", err))
@@ -443,14 +444,14 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 
 		if remove {
 			log.Info("remove broken artifact", slog.Any("path", path))
-			if err := s.fs.RemoveAll(path); err != nil {
+			if err := s.storageFs.RemoveAll(path); err != nil {
 				log.Error("artifact path remove failed", slog.Any("path", path), slog.Any("err", err))
 			}
 		}
 		if !remove {
-			newpath := filepath.Join(broken, strings.Join([]string{repo.ID, artifact.ID}, "-"))
+			newpath := filepath.Join(broken, fmt.Sprintf("%v-%v", repo.ID, artifact.ID))
 			log.Info("move broken artifact", slog.Any("path", path), slog.Any("newpath", newpath))
-			if err := lib.MoveFile(s.fs, path, s.fs, newpath); err != nil {
+			if err := lib.MoveFile(s.storageFs, path, s.brokenFs, newpath); err != nil {
 				log.Error("artifact path move failed", slog.Any("path", path), slog.Any("newpath", newpath), slog.Any("err", err))
 			}
 		}
@@ -460,7 +461,7 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 	}
 }
 
-func cleanInputArtifacts(log ports.Logger, fs ports.FS, input string, artifacts []string) {
+func cleanInputArtifacts(log ports.Logger, f ports.FS, input string, artifacts []string) {
 	log.Info("cleanup input artifacts")
 	for i := range artifacts {
 		// clean up in reverse order, so the checksum file is removed first
@@ -472,12 +473,12 @@ func cleanInputArtifacts(log ports.Logger, fs ports.FS, input string, artifacts 
 			lib.Assert(lib.IsAbs(file))
 			name = file
 		} else {
-			exist, _ := afero.DirExists(fs, name)
+			exist, _ := afero.DirExists(f, name)
 			if !exist {
 				continue
 			}
 		}
-		if err := fs.RemoveAll(name); err != nil {
+		if err := f.RemoveAll(name); err != nil {
 			log.Warn("unable to remove input artifact", slog.Any("err", err), slog.String("name", name))
 		}
 	}
@@ -487,8 +488,7 @@ type diskArtifact struct {
 	fs            ports.FS
 	location      string
 	allFiles      []string
-	goodFiles     []string
-	badFiles      []string
+	files         ports.CheckedFiles
 	checksum      string
 	checksumFile  string
 	createdAt     int64
@@ -499,20 +499,20 @@ type diskArtifact struct {
 
 // The walkDiskArtifact create diskArtifact object base on files in the location
 // The returned diskArtifact.checksumError will not be nil if checksum had a problems
-func walkDiskArtifact(log ports.Logger, fs ports.FS, location string) *diskArtifact {
+func walkDiskArtifact(log ports.Logger, f ports.FS, location string) *diskArtifact {
 	da := &diskArtifact{
-		fs:       fs,
+		fs:       f,
 		location: location,
 	}
 
 	// Detect checksum file and all files in location
-	w := disk.NewFilepathWalk(fs)
+	w := disk.NewFilepathWalk(f)
 	w.Walk(location, func(name string, err error) (bool, error) {
 		if err != nil {
 			log.Error("walk error", slog.String("location", location), slog.String("name", name), slog.Any("err", err))
 			return true, nil
 		}
-		exist, _ := afero.DirExists(fs, name)
+		exist, _ := afero.DirExists(f, name)
 		if exist {
 			return true, nil
 		}
@@ -531,9 +531,9 @@ func walkDiskArtifact(log ports.Logger, fs ports.FS, location string) *diskArtif
 	return da
 }
 
-func checksumDiskArtifact(log ports.Logger, fs ports.FS, checksumFile string) *diskArtifact {
+func checksumDiskArtifact(log ports.Logger, f ports.FS, checksumFile string) *diskArtifact {
 	da := &diskArtifact{
-		fs:           fs,
+		fs:           f,
 		checksumFile: checksumFile,
 	}
 
@@ -543,19 +543,19 @@ func checksumDiskArtifact(log ports.Logger, fs ports.FS, checksumFile string) *d
 
 func (da *diskArtifact) processChecksumFile(log ports.Logger) error {
 	// Detect checksum, good files and bad files in location
-	da.checksum, da.goodFiles, da.badFiles, da.checksumError = adapters.CheckChecksum(log, da.fs, da.checksumFile)
+	da.checksum, da.files, da.checksumError = adapters.CheckChecksum(log, da.fs, da.checksumFile)
 
 	// If needed, add checksum file and _createdAt.txt to good files
-	if !slices.Contains(da.goodFiles, da.checksumFile) {
+	if !slices.Contains(da.files.Good, da.checksumFile) {
 		log.Warn("checksum file is not in checksum file")
-		da.goodFiles = append(da.goodFiles, da.checksumFile)
+		da.files.Good = append(da.files.Good, da.checksumFile)
 	}
 	da.createdAtFile = filepath.Join(filepath.Dir(da.checksumFile), "_createdAt.txt")
-	if lib.First(afero.Exists(da.fs, da.createdAtFile)) && !slices.Contains(da.goodFiles, da.createdAtFile) {
+	if lib.First(afero.Exists(da.fs, da.createdAtFile)) && !slices.Contains(da.files.Good, da.createdAtFile) {
 		log.Warn("createdAt file is not in checksum file")
-		da.goodFiles = append(da.goodFiles, da.createdAtFile)
+		da.files.Good = append(da.files.Good, da.createdAtFile)
 	}
-	slices.Sort(da.goodFiles)
+	slices.Sort(da.files.Good)
 	slices.Sort(da.allFiles)
 
 	// Read back creation time
@@ -573,7 +573,7 @@ func (da *diskArtifact) processChecksumFile(log ports.Logger) error {
 
 	// Calculate total size
 	da.size = 0
-	for _, file := range da.goodFiles {
+	for _, file := range da.files.Good {
 		da.size += lib.FileSize(da.fs, file)
 	}
 
@@ -582,7 +582,7 @@ func (da *diskArtifact) processChecksumFile(log ports.Logger) error {
 
 func (da *diskArtifact) getArtifactMeta(log ports.Logger) models.ArtifactMetas {
 	metas := map[string]string{}
-	for _, f := range da.goodFiles {
+	for _, f := range da.files.Good {
 		if !adapters.IsMetaFile(f) {
 			continue
 		}
@@ -621,13 +621,13 @@ func (da *diskArtifact) getArtifactFiles(ports.Logger) models.ArtifactFiles {
 		}
 		files = append(files, file)
 	}
-	for _, f := range da.goodFiles {
+	for _, f := range da.files.Good {
 		addFile(f, vo.ArtifactIsOK)
 	}
-	for _, f := range da.badFiles {
+	for _, f := range da.files.Bad {
 		addFile(f, vo.ArtifactIsBroken)
 	}
-	if !slices.Contains(da.goodFiles, da.checksumFile) {
+	if !slices.Contains(da.files.Good, da.checksumFile) {
 		addFile(da.checksumFile, vo.ArtifactIsOK)
 	}
 

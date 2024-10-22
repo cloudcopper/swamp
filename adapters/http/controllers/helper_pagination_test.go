@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHelperPagination(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 
 	data := func() []string {
 		ret, max := []string{}, 100

@@ -1,6 +1,9 @@
 package http
 
 import (
+	"os"
+	"time"
+
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -14,7 +17,9 @@ func NewRouter(log ports.Logger) ports.Router {
 	r.Use(middleware.RealIP)
 	r.Use(slogchi.New(log))
 	r.Use(middleware.Recoverer)
-	// r.Use(middleware.Timeout(10 * time.Second))
+	if os.Getenv("GO_ENV") != "development" {
+		r.Use(middleware.Timeout(10 * time.Second))
+	}
 
 	return r
 }

@@ -27,6 +27,8 @@ type ChecksumAlgoInfo struct {
 	algo    ports.ChecksumAlgo
 }
 
+type ChecksumStr = string
+
 var checksumAlgos = []ChecksumAlgoInfo{}
 
 // IsChecksumFile returns true if path match any
@@ -53,7 +55,7 @@ func IsChecksumFile(path string) bool {
 // and all files listed inside the checksumFileName.
 // It returns the checksum of the checksumFileName,
 // good files, broken files and error
-func CheckChecksum(log ports.Logger, fs ports.FS, checksumFileName string) (string, []string, []string, error) {
+func CheckChecksum(log ports.Logger, f ports.FS, checksumFileName string) (ChecksumStr, ports.CheckedFiles, error) {
 	lib.Assert(lib.IsAbs(checksumFileName))
 
 	fileName := filepath.Base(checksumFileName)
@@ -66,12 +68,12 @@ func CheckChecksum(log ports.Logger, fs ports.FS, checksumFileName string) (stri
 		log.Debug("checksum filename match pattern", slog.String("checksumFileName", fileName), slog.String("pattern", it.pattern))
 
 		// Check checksum file
-		checksum, err := it.algo.Sum(fs, checksumFileName)
+		checksum, err := it.algo.Sum(f, checksumFileName)
 		if err != nil {
 			log.Warn("unable to calc checksum", slog.Any("err", err))
 			continue
 		}
-		expected := strings.Replace(it.pattern, "*", hex.EncodeToString(checksum[:]), 1)
+		expected := strings.Replace(it.pattern, "*", hex.EncodeToString(checksum), 1)
 		if expected != fileName {
 			log.Warn("checksum file is broken", slog.String("expected", expected), slog.String("checksumFileName", fileName))
 			continue
@@ -79,18 +81,18 @@ func CheckChecksum(log ports.Logger, fs ports.FS, checksumFileName string) (stri
 		log.Debug("checksum file is valid", slog.String("expected", expected))
 
 		// Check files listed in valid checksum file
-		goodFiles, badFiles, err := it.algo.CheckFiles(fs, checksumFileName)
+		files, err := it.algo.CheckFiles(f, checksumFileName)
 		switch {
 		case err != nil:
-			log.Error("unable check content", slog.Any("goodFiles", goodFiles), slog.Any("badFiles", badFiles), slog.Any("err", err))
-		case len(badFiles) != 0:
-			log.Error("content is partially broken", slog.Any("goodFiles", goodFiles), slog.Any("badFiles", badFiles))
+			log.Error("unable check content", slog.Any("files.Good", files.Good), slog.Any("files.Bad", files.Bad), slog.Any("err", err))
+		case len(files.Bad) != 0:
+			log.Error("content is partially broken", slog.Any("files.Good", files.Good), slog.Any("files.Bad", files.Bad))
 			err = errors.ErrChecksumFileHasBrokenFiles
 		default:
-			log.Debug("content is fine", slog.Any("goodFiles", goodFiles))
+			log.Debug("content is fine", slog.Any("files.Good", files.Good))
 		}
-		return hex.EncodeToString(checksum[:]), goodFiles, badFiles, err
+		return hex.EncodeToString(checksum), files, err
 	}
 
-	return "", nil, nil, errors.ErrIsNotChecksumFile
+	return "", ports.CheckedFiles{}, errors.ErrIsNotChecksumFile
 }

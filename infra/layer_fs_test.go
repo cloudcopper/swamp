@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //
@@ -16,7 +16,7 @@ import (
 var testLayerFs1 embed.FS
 
 func TestLayerFs1(t *testing.T) {
-	assert := assert.New(t)
+	assert := require.New(t)
 	layer1, err := fs.Sub(testLayerFs1, "testdata/layer_fs/test1/layer1.d")
 	assert.NoError(err)
 

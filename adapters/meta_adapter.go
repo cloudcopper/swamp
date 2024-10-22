@@ -49,7 +49,7 @@ func IsMetaFile(path string) bool {
 
 // ParseMetaFile parses meta file via algos
 // and returns key/values map or error
-func ParseMetaFile(log ports.Logger, fs ports.FS, metaFileName string) (map[string]string, error) {
+func ParseMetaFile(log ports.Logger, f ports.FS, metaFileName string) (map[string]string, error) {
 	lib.Assert(lib.IsAbs(metaFileName))
 
 	fileName := filepath.Base(metaFileName)
@@ -62,7 +62,7 @@ func ParseMetaFile(log ports.Logger, fs ports.FS, metaFileName string) (map[stri
 		log.Debug("meta filename match pattern", slog.String("metaFileName", fileName), slog.String("pattern", it.pattern))
 
 		// Parse meta file
-		meta, err := it.algo.ParseMetaFile(fs, metaFileName)
+		meta, err := it.algo.ParseMetaFile(f, metaFileName)
 		if errors.Is(err, ports.ErrWrongMetaFormat) {
 			continue
 		}

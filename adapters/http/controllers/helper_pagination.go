@@ -5,8 +5,8 @@ import (
 	"strconv"
 )
 
-func helperPagination[T any](r *http.Request, data []T, perPage int) ([]T, int) {
-	page := 1
+func helperPagination[T any](r *http.Request, data []T, perPage int) (_ []T, page int) {
+	page = 1
 	if r.URL.Query().Get("page") != "" {
 		page, _ = strconv.Atoi(r.URL.Query().Get("page"))
 	}

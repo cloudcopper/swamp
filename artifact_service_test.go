@@ -26,8 +26,8 @@ func TestArtifactServiceScenario1(t *testing.T) {
 	assert := require.New(t)
 
 	testRepoID := "repo2"
-	input := filepath.Join("/var/lib/swamp/input", testRepoID)
-	storage := filepath.Join("/var/lib/swamp/storage", testRepoID)
+	input := "/var/lib/swamp/input/" + testRepoID
+	storage := "/var/lib/swamp/storage/" + testRepoID
 	dirs := []string{
 		"/what/ever", "/what/other",
 		input, storage,
@@ -73,10 +73,10 @@ func TestArtifactServiceScenario1(t *testing.T) {
 
 		// Create input artifact files - five(5) files - four(4) artifacts + checksum file
 		creationTime := time.Now().UTC().Unix()
-		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file1.bin"), random.ByteSlice(32*1024), 0644))
-		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file2.bin"), random.ByteSlice(64*1024), 0644))
-		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_export.txt"), []byte(random.Declare(32)), 0644))
-		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_createdAt.txt"), []byte(fmt.Sprintf("%v", creationTime)), 0644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file1.bin"), random.ByteSlice(32*1024), 0o644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "file2.bin"), random.ByteSlice(64*1024), 0o644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_export.txt"), []byte(random.Declare(32)), 0o644))
+		assert.NoError(afero.WriteFile(fs, filepath.Join(input, "_createdAt.txt"), []byte(fmt.Sprintf("%v", creationTime)), 0o644))
 		checksumFileName := sealArtifact(t, fs, input)
 
 		//

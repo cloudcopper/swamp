@@ -15,3 +15,6 @@ coverage:
 	CGO_ENABLED=0 go test -coverprofile cover.out ./...
 	go tool cover -html cover.out -o cover.html
 
+.PHONY: crit
+crit:
+	gocritic check -enableAll ./...

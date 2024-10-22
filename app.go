@@ -44,7 +44,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	}
 
 	// Load configuration
-	config, err := config.LoadConfig(log, fs)
+	cfg, err := config.LoadConfig(log, fs)
 	if err != nil {
 		log.Error("unable to load config!!!", slog.Any("err", err))
 		return lib.NewErrorCode(err, errors.RetLoadConfigError)
@@ -107,7 +107,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	defer inputWatcher.Close()
 
 	// Perform neccesery startup operations
-	if err := startup(log, config, bus, repoRepository); err != nil {
+	if err := startup(log, cfg, bus, repoRepository); err != nil {
 		return err
 	}
 

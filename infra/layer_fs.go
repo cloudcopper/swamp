@@ -67,10 +67,10 @@ func NewLayerFileSystem(params ...interface{}) (*LayerFileSystem, error) {
 	return l, nil
 }
 
-func (fs *LayerFileSystem) Open(name string) (fs.File, error) {
+func (l *LayerFileSystem) Open(name string) (fs.File, error) {
 	lib.Assert(!strings.Contains(name, ".."))
-	for _, l := range fs.layers {
-		f, err := l.Open(name)
+	for _, layer := range l.layers {
+		f, err := layer.Open(name)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -79,15 +79,15 @@ func (fs *LayerFileSystem) Open(name string) (fs.File, error) {
 		if err != nil && !info.IsDir() {
 			return f, err
 		}
-		d := &layerDir{f, fs, name}
+		d := &layerDir{f, l, name}
 		return d, nil
 	}
 	return nil, os.ErrNotExist
 }
-func (fs *LayerFileSystem) ReadFile(name string) ([]byte, error) {
+func (l *LayerFileSystem) ReadFile(name string) ([]byte, error) {
 	lib.Assert(!strings.Contains(name, ".."))
-	for _, l := range fs.layers {
-		data, err := l.ReadFile(name)
+	for _, layer := range l.layers {
+		data, err := layer.ReadFile(name)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -104,8 +104,8 @@ type subFileSystem struct {
 	fs.SubFS
 }
 
-func (r *subFileSystem) ReadFile(name string) ([]byte, error) {
-	file, err := r.Open(name)
+func (s *subFileSystem) ReadFile(name string) ([]byte, error) {
+	file, err := s.Open(name)
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +126,8 @@ func (r *subFileSystem) ReadFile(name string) ([]byte, error) {
 	return buf, err
 }
 
-func (r *subFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
-	file, err := r.Open(".")
+func (s *subFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
+	file, err := s.Open(".")
 	if err != nil {
 		return nil, err
 	}
@@ -153,18 +153,18 @@ type osFileSystem struct {
 	root string
 }
 
-func (r *osFileSystem) Open(name string) (fs.File, error) {
-	path := filepath.Join(r.root, name)
+func (o *osFileSystem) Open(name string) (fs.File, error) {
+	path := filepath.Join(o.root, name)
 	return os.Open(path)
 }
 
-func (r *osFileSystem) ReadDir(name string) ([]os.DirEntry, error) {
-	path := filepath.Join(r.root, name)
+func (o *osFileSystem) ReadDir(name string) ([]os.DirEntry, error) {
+	path := filepath.Join(o.root, name)
 	return os.ReadDir(path)
 }
 
-func (r *osFileSystem) ReadFile(name string) ([]byte, error) {
-	path := filepath.Join(r.root, name)
+func (o *osFileSystem) ReadFile(name string) ([]byte, error) {
+	path := filepath.Join(o.root, name)
 	return os.ReadFile(path)
 }
 
@@ -174,11 +174,11 @@ type layerDir struct {
 	name string
 }
 
-func (ld *layerDir) ReadDir(n int) ([]fs.DirEntry, error) {
+func (l *layerDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	m := make(map[string]fs.DirEntry)
 
-	for _, l := range ld.fs.layers {
-		file, err := l.Open(ld.name)
+	for _, layer := range l.fs.layers {
+		file, err := layer.Open(l.name)
 		if err != nil {
 			continue
 		}

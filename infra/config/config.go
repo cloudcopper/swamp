@@ -17,7 +17,7 @@ import (
 )
 
 type Config struct {
-	Repos map[string]models.Repo
+	Repos map[string]*models.Repo
 }
 
 func (c *Config) String() string {
@@ -52,8 +52,8 @@ var (
 	TimerBrokenLimit      = 1
 )
 
-func LoadConfig(log ports.Logger, fs fs.ReadFileFS) (*Config, error) {
-	config, err := loadReposConfig(log, fs, ReposConfigFileName)
+func LoadConfig(log ports.Logger, f fs.ReadFileFS) (*Config, error) {
+	config, err := loadReposConfig(log, f, ReposConfigFileName)
 	if err != nil {
 		return config, err
 	}
@@ -70,11 +70,11 @@ func LoadConfig(log ports.Logger, fs fs.ReadFileFS) (*Config, error) {
 // The loadReposConfig reads named repos configs file from given fs,
 // execute file as env template,
 // and unmarshal result to the config
-func loadReposConfig(log ports.Logger, fs fs.ReadFileFS, fileName string) (*Config, error) {
+func loadReposConfig(log ports.Logger, f fs.ReadFileFS, fileName string) (*Config, error) {
 	log.Info("loading repos config", slog.String("fileName", fileName))
 	blob, err := os.ReadFile(fileName)
 	if err != nil {
-		blob, err = fs.ReadFile(fileName)
+		blob, err = f.ReadFile(fileName)
 		if err != nil {
 			return nil, err
 		}
@@ -99,12 +99,12 @@ func loadReposConfig(log ports.Logger, fs fs.ReadFileFS, fileName string) (*Conf
 
 // The processReposConfigs returns only meaningful repo configuration
 // with correct @refRepoID macro
-func processReposConfigs(log ports.Logger, config *Config) *Config {
+func processReposConfigs(log ports.Logger, cfg *Config) *Config {
 	ret := &Config{
-		Repos: make(map[string]models.Repo),
+		Repos: make(map[string]*models.Repo),
 	}
 
-	for k, v := range config.Repos {
+	for k, v := range cfg.Repos {
 		log := log.With(slog.String("configID", k))
 
 		// Skip IDs starting with _
@@ -152,8 +152,8 @@ func processReposConfigs(log ports.Logger, config *Config) *Config {
 	return ret
 }
 
-func removeSameRepos(log ports.Logger, in map[string]models.Repo) map[string]models.Repo {
-	out := map[string]models.Repo{}
+func removeSameRepos(log ports.Logger, in map[string]*models.Repo) map[string]*models.Repo {
+	out := map[string]*models.Repo{}
 
 	isNested := func(a, b string) bool {
 		if !strings.HasSuffix(a, "/") {
@@ -172,16 +172,17 @@ func removeSameRepos(log ports.Logger, in map[string]models.Repo) map[string]mod
 			if k1 == k2 {
 				continue
 			}
-			if v1.Input == v2.Input {
+			switch {
+			case v1.Input == v2.Input:
 				isDup = true
 				log.Error("duplicated config detected", slog.Any("repoID", k1), slog.Any("input", v1.Input))
-			} else if v1.Storage == v2.Storage {
+			case v1.Storage == v2.Storage:
 				isDup = true
 				log.Error("duplicated config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
-			} else if isNested(v1.Storage, v2.Storage) {
+			case isNested(v1.Storage, v2.Storage):
 				isDup = true
 				log.Error("nested config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
-			} else if isNested(v1.Input, v2.Input) {
+			case isNested(v1.Input, v2.Input):
 				isDup = true
 				log.Error("nested config detected", slog.Any("repoID", k1), slog.Any("storage", v1.Storage))
 			}

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseDuration(t *testing.T) {
@@ -35,7 +35,7 @@ func TestParseDuration(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.str, func(t *testing.T) {
-			assert := assert.New(t)
+			assert := require.New(t)
 			d, err := ParseDuration(testCase.str)
 			assert.NoError(err)
 			assert.Equal(Duration(testCase.val), d)

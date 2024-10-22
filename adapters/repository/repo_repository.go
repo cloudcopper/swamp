@@ -16,11 +16,11 @@ type RepoRepository struct {
 	validator *validator.Validate
 }
 
-func NewRepoRepository(db ports.DB, fs ports.FS) (*RepoRepository, error) {
+func NewRepoRepository(db ports.DB, f ports.FS) (*RepoRepository, error) {
 	r := &RepoRepository{
 		db:        db,
-		fs:        fs,
-		validator: lib.NewValidator(fs),
+		fs:        f,
+		validator: lib.NewValidator(f),
 	}
 	_, err := r.FindAll()
 	return r, err
@@ -47,17 +47,20 @@ func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
 	for _, flag := range flags {
 		switch v := flag.(type) {
 		case ports.WithRelationship:
-			if v {
-				db = db.Preload("Meta", func(db ports.DB) ports.DB {
-					return db.Order("key ASC")
-				})
-				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
-					return db.Order("created_at DESC")
-				})
-				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
-					return db.Order("key ASC")
-				})
+			if !v {
+				continue
 			}
+			db = db.Preload("Meta", func(db ports.DB) ports.DB {
+				return db.Order("key ASC")
+			})
+			db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
+				return db.Order("created_at DESC")
+			})
+			db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
+				return db.Order("key ASC")
+			})
+		default:
+			panic(flag)
 		}
 	}
 
@@ -76,20 +79,23 @@ func (r *RepoRepository) FindByID(id models.RepoID, flags ...interface{}) (*mode
 	for _, flag := range flags {
 		switch v := flag.(type) {
 		case ports.WithRelationship:
-			if v {
-				db = db.Preload("Meta", func(db ports.DB) ports.DB {
-					return db.Order("key ASC")
-				})
-				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
-					return db.Order("created_at DESC")
-				})
-				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
-					return db.Order("key ASC")
-				})
-				db = db.Preload("Artifacts.Files", func(db ports.DB) ports.DB {
-					return db.Order("name ASC")
-				})
+			if !v {
+				continue
 			}
+			db = db.Preload("Meta", func(db ports.DB) ports.DB {
+				return db.Order("key ASC")
+			})
+			db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
+				return db.Order("created_at DESC")
+			})
+			db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
+				return db.Order("key ASC")
+			})
+			db = db.Preload("Artifacts.Files", func(db ports.DB) ports.DB {
+				return db.Order("name ASC")
+			})
+		default:
+			panic(flag)
 		}
 	}
 

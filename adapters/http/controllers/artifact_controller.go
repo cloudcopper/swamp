@@ -97,24 +97,30 @@ func (c *ArtifactController) DownloadZip(w http.ResponseWriter, r *http.Request)
 
 	// Loop over the files and add each one to the zip
 	for _, modelFile := range files {
-		fileName := modelFile.Name
-		filePath := filepath.Join(artifact.Storage, fileName)
-		file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
-		if err != nil {
-			c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
-			return
-		}
-		defer file.Close()
+		if !func() (cont bool) {
+			fileName := modelFile.Name
+			filePath := filepath.Join(artifact.Storage, fileName)
+			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+			if err != nil {
+				c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
+				return
+			}
+			defer file.Close()
 
-		// Create a file entry in the zip archive
-		fileWriter, err := zipWriter.Create(fileName)
-		if err != nil {
-			c.renderFileError(w, repoID, artifactID, "create file in zip", filePath, err)
-			return
-		}
-		// Copy the file content into the zip archive
-		if _, err := io.Copy(fileWriter, file); err != nil {
-			c.renderFileError(w, repoID, artifactID, "write file to zip", filePath, err)
+			// Create a file entry in the zip archive
+			fileWriter, err := zipWriter.Create(fileName)
+			if err != nil {
+				c.renderFileError(w, repoID, artifactID, "create file in zip", filePath, err)
+				return
+			}
+			// Copy the file content into the zip archive
+			if _, err := io.Copy(fileWriter, file); err != nil {
+				c.renderFileError(w, repoID, artifactID, "write file to zip", filePath, err)
+				return
+			}
+
+			return true
+		}() {
 			return
 		}
 	}
@@ -151,36 +157,42 @@ func (c *ArtifactController) DownloadGzip(w http.ResponseWriter, r *http.Request
 
 	// Loop over the files and add each one to the tar archive
 	for _, modelFile := range files {
-		fileName := modelFile.Name
-		filePath := filepath.Join(artifact.Storage, fileName)
-		file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
-		if err != nil {
-			c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
-			return
-		}
-		defer file.Close()
+		if !func() (cont bool) {
+			fileName := modelFile.Name
+			filePath := filepath.Join(artifact.Storage, fileName)
+			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+			if err != nil {
+				c.renderFileError(w, repoID, artifactID, "open file", filePath, err)
+				return
+			}
+			defer file.Close()
 
-		// Get file information
-		fileInfo, err := file.Stat()
-		if err != nil {
-			c.renderFileError(w, repoID, artifactID, "stat file", filePath, err)
-			return
-		}
+			// Get file information
+			fileInfo, err := file.Stat()
+			if err != nil {
+				c.renderFileError(w, repoID, artifactID, "stat file", filePath, err)
+				return
+			}
 
-		// Create tar header based on the file info
-		header := &tar.Header{
-			Name: fileName, // TODO Check with nested subdirectories
-			Size: fileInfo.Size(),
-			Mode: int64(fileInfo.Mode()),
-		}
-		if err := tarWriter.WriteHeader(header); err != nil {
-			c.renderFileError(w, repoID, artifactID, "write tar header", filePath, err)
-			return
-		}
+			// Create tar header based on the file info
+			header := &tar.Header{
+				Name: fileName, // TODO Check with nested subdirectories
+				Size: fileInfo.Size(),
+				Mode: int64(fileInfo.Mode()),
+			}
+			if err := tarWriter.WriteHeader(header); err != nil {
+				c.renderFileError(w, repoID, artifactID, "write tar header", filePath, err)
+				return
+			}
 
-		// Copy the file content into the tar archive
-		if _, err := io.Copy(tarWriter, file); err != nil {
-			c.renderFileError(w, repoID, artifactID, "write file to tar", filePath, err)
+			// Copy the file content into the tar archive
+			if _, err := io.Copy(tarWriter, file); err != nil {
+				c.renderFileError(w, repoID, artifactID, "write file to tar", filePath, err)
+				return
+			}
+
+			return true
+		}() {
 			return
 		}
 	}
@@ -204,7 +216,7 @@ func (c *ArtifactController) renderServerError(w http.ResponseWriter, repoID mod
 	c.render.HTML(w, http.StatusInternalServerError, "artifact-server-error", Data{repoID, artifactID, err})
 }
 
-func (c *ArtifactController) renderFileError(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, op string, filename string, err error) {
+func (c *ArtifactController) renderFileError(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, op, filename string, err error) {
 	type Data struct {
 		RepoID     models.RepoID
 		ArtifactID models.ArtifactID

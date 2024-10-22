@@ -108,8 +108,8 @@ func TestWatcherServiceBasic1(t *testing.T) {
 	assert.Equal(file[0], file1)
 }
 
-func appendFile(name string, content string) error {
-	f, err := os.OpenFile(name, os.O_APPEND|os.O_WRONLY, 0660)
+func appendFile(name, content string) error {
+	f, err := os.OpenFile(name, os.O_APPEND|os.O_WRONLY, 0o660)
 	if err != nil {
 		return err
 	}

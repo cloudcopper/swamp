@@ -9,9 +9,9 @@ import (
 
 type Render = *render.Render
 
-func NewRender(fs fs.FS) Render {
+func NewRender(f fs.FS) Render {
 	opts := render.Options{
-		FileSystem: render.FS(fs),
+		FileSystem: render.FS(f),
 		Extensions: []string{".tmpl", ".html"},
 		IsDevelopment: func() bool {
 			return os.Getenv("GO_ENV") == "development"

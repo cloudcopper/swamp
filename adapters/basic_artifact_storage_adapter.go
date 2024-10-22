@@ -21,11 +21,11 @@ type BasicArtifactStorageAdapter struct {
 	fs  ports.FS
 }
 
-func NewBasicArtifactStorageAdapter(log ports.Logger, fs ports.FS) (*BasicArtifactStorageAdapter, error) {
+func NewBasicArtifactStorageAdapter(log ports.Logger, f ports.FS) (*BasicArtifactStorageAdapter, error) {
 	log = log.With(slog.String("entity", "BasicArtifactStorageAdapter"))
 	s := &BasicArtifactStorageAdapter{
 		log: log,
-		fs:  fs,
+		fs:  f,
 	}
 
 	return s, nil
@@ -77,7 +77,7 @@ func (s *BasicArtifactStorageAdapter) NewArtifact(src ports.FS, input string, ar
 		if err := lib.MoveFile(src, fileName, dst, newpath); err != nil {
 			return nil, err
 		}
-		size = size + lib.FileSize(dst, newpath)
+		size += lib.FileSize(dst, newpath)
 	}
 
 	// Optional create file _createdAt.txt containing epoch time.

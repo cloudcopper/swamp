@@ -12,8 +12,8 @@ func init() {
 
 // Value returns random value in range of [a[0],a[1]]
 func Value(a []int) int {
-	min, max := a[0], a[1]
-	return rand.Intn(max-min+1) + min
+	m, n := a[0], a[1]
+	return rand.Intn(n-m+1) + m
 }
 
 // Element returns random element of a
@@ -22,10 +22,10 @@ func Element[T any](a []T) T {
 }
 
 // ByteSlice returns slice of random bytes
-func ByteSlice(max int) []byte {
+func ByteSlice(n int) []byte {
 	data := []byte{}
-	max = Value([]int{0, max})
-	for x := 0; x < max; x++ {
+	n = Value([]int{0, n})
+	for x := 0; x < n; x++ {
 		data = append(data, byte(Value([]int{0, 255})))
 	}
 	return data
