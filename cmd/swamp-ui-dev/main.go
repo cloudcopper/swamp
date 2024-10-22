@@ -152,6 +152,7 @@ func app(log *slog.Logger) error {
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, fakeStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	router.Get("/repo/{repoID}/artifact/{artifactID}/file/*", artifactController.DownloadSingleFile)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.tar.gz", artifactController.DownloadGzip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.zip", artifactController.DownloadZip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)

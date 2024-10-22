@@ -1,9 +1,8 @@
 TODO
 ====
 - broken artifacts shall not be possible to download within single click/direct url
+- broken files shall not be possible to download within single click/direct url
 -- figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id
-- webui marks broken files in artifact as well whole artifact
-- artifacts download as individual files
 
 - layered fs with afero instead of custom?
 
@@ -22,9 +21,8 @@ CUSTOM.md - how to customize
 
 - tests - increate test coverage
 
-- artifacts checks functionality
--- Mark broken files in file.State
--- Handle manual artifact removal from artifact storage
+- handle manual artifact removal from artifact storage
+- handle manual artifact adding to artifact storage
 
 - access log
 - input web (the way to put over http new artifacts)
