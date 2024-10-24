@@ -1,21 +1,19 @@
-{{with .Artifact}}
-    <h1><a href="/repo/{{.RepoID}}">{{.RepoID}}</a>/{{.ArtifactID}}</h1>
-    <p>CreatedAt:<span>{{.CreatedAt}}</span></p>
-    <p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
-    <p>Size:<span>{{.Size}}</span></p>
-    <p>State:<span>{{.State}}</spam></p>
-    <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
-    <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
+<h1><a href="/repo/{{.RepoID}}">{{.RepoID}}</a>/{{.ArtifactID}}</h1>
+<p>CreatedAt:<span>{{.CreatedAt}}</span></p>
+<p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
+<p>Size:<span>{{.Size}}</span></p>
+<p>State:<span>{{.State}}</spam></p>
+<p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
+<p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
 
-    <h2>Files</h2>
-    {{range .Files}}
-        <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}/file/{{.Name}}">{{.Name}}</a>:<span>{{.Size}}</span>, <span>{{.State}}</span></p>
-    {{end}}
+<h2>Files</h2>
+{{range .Files}}
+    <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}/file/{{.Name}}">{{.Name}}</a>:<span>{{.Size}}</span>, <span>{{.State}}</span></p>
+{{end}}
 
-    {{if .Meta}}
-    <h2>Meta</h2>
-    {{range .Meta}}
-        <p>{{.Key}}:<span>{{.Value}}</span></p>
-    {{end}}
-    {{end}}
+{{if .Meta}}
+<h2>Meta</h2>
+{{range .Meta}}
+    <p>{{.Key}}:<span>{{.Value}}</span></p>
+{{end}}
 {{end}}

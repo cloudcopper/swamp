@@ -1,1 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swamp - only minimalistic artifacts storage</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+    .is-equal-height {
+        /* keep cards equal height */
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .card-footer {
+        /* keep card footer at bottom */
+        margin-top: auto;
+    }
+
+    .to-bottom {
+        /* keep last div at bottom of parent div.is-equal-height */
+        margin-top: auto;
+    }
+
+    .hero {
+        margin-top: 0.1rem;
+    }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/timeago.js/4.0.2/timeago.min.js"></script>
+    <script>
+    // Initialize timeago.js for all elements with class "timeago"
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.timeago').forEach(function (element) {
+        var epochTimestamp = element.getAttribute('data-time');
+        var date = new Date(epochTimestamp * 1000); // convert epoch to milliseconds
+        element.innerText = timeago.format(date);
+        });
+    });
+    </script>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar is-info" role="navigation" aria-label="main navigation">
+      <div class="navbar-brand">
+        <a class="navbar-item" href="/"><i class="fas fa-home"></i>Home</a>
+      </div>
+      <div class="navbar-menu">
+        <div class="navbar-start">
+        {{if hasField . "RepoID"}}{{if .RepoID}}
+        <a class="navbar-item" href="/repo/{{.RepoID}}"><i class="fas fa-book"></i>{{.RepoID}}</a>
+        {{if hasField . "ArtifactID"}}{{if .ArtifactID}}
+        <a class="navbar-item" href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}"><i class="fas fa-puzzle-piece"></i>{{.ArtifactID}}</a>
+        {{end}}{{end}}
+        {{end}}{{end}}
+        </div>
+      </div>
+    </nav>
 {{ yield }}
+    <!-- Footer -->
+    <footer class="footer has-background-info">
+        <div class="content has-text-centered">
+            <strong>swamp</strong> by <a href="https://github.com/cloudcopper/swamp">cloudcopper</a>.
+            The source code is licensed under <a href="http://opensource.org/licenses/mit-license.php">MIT</a>.
+        </div>
+    </footer>
+</body>
+</html>

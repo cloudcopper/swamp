@@ -1,27 +1,25 @@
-{{with .Repo}}
-    <a href="/">home</a>
-    <h1>{{.Name}}</h1>
-    <p>{{.Description}}</p>
-    <p>Retention:<span>{{.Retention}}</span></p>
-    <p>Artifacts:<span>{{len .Artifacts}}</span></p>
-    <p>Size:<span>{{.Size}}</span></p>
-    {{if .Artifacts}}
-        {{range .Artifacts}}
-            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}">
-            <h2>{{.ArtifactID}}</h2>
-            <p>CreatedAt:<span>{{.CreatedAt}}</span></p>
-            <p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
-            <p>Size:<span>{{.Size}}</span></p>
-            <p>State:<span>{{.State}}</span></p>
-            <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
-            <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
-            {{if .Meta}}
-            <h2>Meta</h2>
-            {{range .Meta}}
-                <p>{{.Key}}:<span>{{.Value}}</span></p>
-            {{end}}
-            {{end}}
-            </a>
+<a href="/">home</a>
+<h1>{{.Name}}</h1>
+<p>{{.Description}}</p>
+<p>Retention:<span>{{.Retention}}</span></p>
+<p>Artifacts:<span>{{len .Artifacts}}</span></p>
+<p>Size:<span>{{.Size}}</span></p>
+{{if .Artifacts}}
+    {{range .Artifacts}}
+        <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}">
+        <h2>{{.ArtifactID}}</h2>
+        <p>CreatedAt:<span>{{.CreatedAt}}</span></p>
+        <p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
+        <p>Size:<span>{{.Size}}</span></p>
+        <p>State:<span>{{.State}}</span></p>
+        <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
+        <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
+        {{if .Meta}}
+        <h2>Meta</h2>
+        {{range .Meta}}
+            <p>{{.Key}}:<span>{{.Value}}</span></p>
         {{end}}
+        {{end}}
+        </a>
     {{end}}
 {{end}}

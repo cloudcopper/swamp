@@ -41,12 +41,7 @@ func (c *RepoController) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := struct {
-		Repo *viewmodels.Repo
-	}{
-		Repo: viewmodels.NewRepo(repo),
-	}
-
+	var data *viewmodels.Repo = viewmodels.NewRepo(repo)
 	c.render.HTML(w, http.StatusOK, "repo", data)
 }
 

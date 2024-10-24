@@ -61,12 +61,7 @@ func (c *ArtifactController) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := struct {
-		Artifact *viewmodels.Artifact
-	}{
-		Artifact: viewmodels.NewArtifact(artifact),
-	}
-
+	var data *viewmodels.Artifact = viewmodels.NewArtifact(artifact)
 	c.render.HTML(w, http.StatusOK, "artifact", data)
 }
 
