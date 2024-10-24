@@ -122,11 +122,11 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, artifactStorage)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	router.Get("/repo/{repoID}/artifact/{artifactID}/file/*", artifactController.DownloadSingleFile)
 	// WARN Next two routes are more like documentation as those are not working
 	// Please see https://github.com/go-chi/chi/issues/758 and related
 	// So the artifactController.GetHandler would handle calling proper handled
 	// base on suffix
-	router.Get("/repo/{repoID}/artifact/{artifactID}/file/*", artifactController.DownloadSingleFile)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.tar.gz", artifactController.DownloadGzip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.zip", artifactController.DownloadZip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}", artifactController.Get)
