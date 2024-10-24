@@ -42,21 +42,21 @@ func TestArtifactServiceScenario1(t *testing.T) {
 
 	repos := []*models.Repo{
 		{
-			ID:        "repo1",
+			RepoID:    "repo1",
 			Name:      "Repo1",
 			Input:     "/what/ever",
 			Storage:   "/what/other",
 			Retention: types.Duration(30 * 24 * time.Hour),
 		},
 		{
-			ID:        testRepoID,
+			RepoID:    testRepoID,
 			Name:      "Repo2",
 			Input:     input,
 			Storage:   storage,
 			Retention: types.Duration(24 * time.Hour),
 		},
 		{
-			ID:        "repo3",
+			RepoID:    "repo3",
 			Name:      "Repo3",
 			Input:     "/dont/care",
 			Storage:   "/nobody/other",
@@ -86,7 +86,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		repoModel, err := rr.FindByID(testRepoID, ports.WithRelationship(true))
 		assert.NoError(err)
 		assert.NotNil(repoModel)
-		assert.Equal(testRepoID, repoModel.ID)
+		assert.Equal(testRepoID, repoModel.RepoID)
 		assert.Equal(input, repoModel.Input)
 		assert.Equal(storage, repoModel.Storage)
 		assert.Empty(repoModel.Artifacts)
@@ -124,7 +124,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		repoModel, err = rr.FindByID(testRepoID, ports.WithRelationship(true))
 		assert.NoError(err)
 		assert.NotNil(repoModel)
-		assert.Equal(testRepoID, repoModel.ID)
+		assert.Equal(testRepoID, repoModel.RepoID)
 		assert.NotZero(repoModel.Size)
 		assert.Len(repoModel.Artifacts, 1)
 
@@ -147,7 +147,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.Len(files, 5)
 
 		// ...storage has artifacts
-		storedArtifactPath := filepath.Join(storage, artifactModel.ID)
+		storedArtifactPath := filepath.Join(storage, artifactModel.ArtifactID)
 		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "file1.bin"))))
 		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "file2.bin"))))
 		assert.True(lib.First(afero.Exists(fs, filepath.Join(storedArtifactPath, "_export.txt"))))
@@ -157,7 +157,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 
 		// ...and has five(5) files as test created
 		/* TODO Change it!!
-		files, err = st.GetArtifactFiles(repoModel.Storage, artifactModel.ID)
+		files, err = st.GetArtifactFiles(repoModel.Storage, artifactModel.ArtifactID)
 		assert.NoError(err)
 		assert.Len(files, 5)
 		*/

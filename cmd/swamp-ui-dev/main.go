@@ -145,7 +145,7 @@ func app(log *slog.Logger) error {
 	router := http.NewRouter(log)
 	// Create render object
 	// It also loads templates
-	render := infra.NewRender(fs)
+	render := infra.NewRender(fs, "layout")
 	// Create controllers
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
@@ -215,7 +215,7 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 		}
 
 		repo := &models.Repo{
-			ID:          repoID,
+			RepoID:      repoID,
 			Name:        name,
 			Description: random.Sentences(numDescSentences),
 			Input:       rs(dirs),
@@ -260,16 +260,16 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 				size += int(f.Size)
 			}
 			artifact := &models.Artifact{
-				RepoID:    repoID,
-				ID:        artifactID,
-				Storage:   repo.Storage,
-				Size:      types.Size(size),
-				State:     state,
-				CreatedAt: createdAt,
-				ExpiredAt: expiredAt,
-				Checksum:  checksum,
-				Meta:      meta,
-				Files:     files,
+				RepoID:     repoID,
+				ArtifactID: artifactID,
+				Storage:    repo.Storage,
+				Size:       types.Size(size),
+				State:      state,
+				CreatedAt:  createdAt,
+				ExpiredAt:  expiredAt,
+				Checksum:   checksum,
+				Meta:       meta,
+				Files:      files,
 			}
 			err := repos.Artifact().Create(artifact)
 			if err != nil {

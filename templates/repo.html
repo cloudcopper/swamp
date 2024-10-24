@@ -7,14 +7,14 @@
     <p>Size:<span>{{.Size}}</span></p>
     {{if .Artifacts}}
         {{range .Artifacts}}
-            <a href="/repo/{{.RepoID}}/artifact/{{.ID}}">
-            <h2>{{.ID}}</h2>
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}">
+            <h2>{{.ArtifactID}}</h2>
             <p>CreatedAt:<span>{{.CreatedAt}}</span></p>
             <p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
             <p>Size:<span>{{.Size}}</span></p>
             <p>State:<span>{{.State}}</span></p>
-            <p><a href="/repo/{{.RepoID}}/artifact/{{.ID}}.zip">Download as .zip</a></p>
-            <p><a href="/repo/{{.RepoID}}/artifact/{{.ID}}.tar.gz">Download as .tar.gz</a></p>
+            <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
+            <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
             {{if .Meta}}
             <h2>Meta</h2>
             {{range .Meta}}

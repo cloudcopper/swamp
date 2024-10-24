@@ -17,16 +17,16 @@ const EmptyArtifactID = ArtifactID("")
 type Artifacts []*Artifact
 
 type Artifact struct {
-	RepoID    RepoID           `gorm:"primaryKey;not null" validate:"required,validid"`
-	ID        ArtifactID       `gorm:"primaryKey;not null" validate:"required,validid"`
-	Storage   string           `gorm:"not null" validate:"required,min=3,dir,abspath"`
-	Size      types.Size       `gorm:"not null" validate:"required,gt=0"`
-	State     vo.ArtifactState `gorm:"int" validate:"min=0,max=3"`
-	CreatedAt int64            `gorm:"index;column:created_at" validate:"required,gt=0"` // UTC Unix time of creation - equal to ```date +%s```
-	ExpiredAt int64            `gorm:"index;column:expired_at" validate:"required,gt=0"` // UTC Unix time at which the artifacts expires
-	Checksum  string           `gorm:"not null" validate:"required,min=8"`
-	Meta      ArtifactMetas    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
-	Files     ArtifactFiles    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" valudate:"-"`
+	RepoID     RepoID           `gorm:"primaryKey;not null" validate:"required,validid"`
+	ArtifactID ArtifactID       `gorm:"primaryKey;not null" validate:"required,validid"`
+	Storage    string           `gorm:"not null" validate:"required,min=3,dir,abspath"`
+	Size       types.Size       `gorm:"not null" validate:"required,gt=0"`
+	State      vo.ArtifactState `gorm:"int" validate:"min=0,max=3"`
+	CreatedAt  int64            `gorm:"index;column:created_at" validate:"required,gt=0"` // UTC Unix time of creation - equal to ```date +%s```
+	ExpiredAt  int64            `gorm:"index;column:expired_at" validate:"required,gt=0"` // UTC Unix time at which the artifacts expires
+	Checksum   string           `gorm:"not null" validate:"required,min=8"`
+	Meta       ArtifactMetas    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" validate:"-"`
+	Files      ArtifactFiles    `gorm:"foreignKey:RepoID,ArtifactID;constraint:OnDelete:CASCADE;" valudate:"-"`
 }
 
 func (model *Artifact) Validate(val *validator.Validate) error {
@@ -52,9 +52,9 @@ func (model *Artifact) Validate(val *validator.Validate) error {
 			return errors.ErrIncorrectMetaID
 		}
 		if m.ArtifactID == "" {
-			m.ArtifactID = model.ID
+			m.ArtifactID = model.ArtifactID
 		}
-		if m.ArtifactID != model.ID {
+		if m.ArtifactID != model.ArtifactID {
 			return errors.ErrIncorrectMetaID
 		}
 	}
@@ -66,9 +66,9 @@ func (model *Artifact) Validate(val *validator.Validate) error {
 			return errors.ErrIncorrectFileID
 		}
 		if f.ArtifactID == "" {
-			f.ArtifactID = model.ID
+			f.ArtifactID = model.ArtifactID
 		}
-		if f.ArtifactID != model.ID {
+		if f.ArtifactID != model.ArtifactID {
 			return errors.ErrIncorrectFileID
 		}
 		if f.State.IsBroken() {
@@ -79,9 +79,9 @@ func (model *Artifact) Validate(val *validator.Validate) error {
 	return nil
 }
 
-func (a Artifacts) HasArtifactID(id ArtifactID) bool {
+func (a Artifacts) HasArtifactID(artifactID ArtifactID) bool {
 	for _, artifact := range a {
-		if artifact.ID == id {
+		if artifact.ArtifactID == artifactID {
 			return true
 		}
 	}

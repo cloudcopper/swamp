@@ -1,11 +1,11 @@
 {{with .Artifact}}
-    <h1><a href="/repo/{{.RepoID}}">{{.RepoID}}</a>/{{.ID}}</h1>
+    <h1><a href="/repo/{{.RepoID}}">{{.RepoID}}</a>/{{.ArtifactID}}</h1>
     <p>CreatedAt:<span>{{.CreatedAt}}</span></p>
     <p>ExpiredAt:<span>{{.ExpiredAt}}</span></p>
     <p>Size:<span>{{.Size}}</span></p>
     <p>State:<span>{{.State}}</spam></p>
-    <p><a href="/repo/{{.RepoID}}/artifact/{{.ID}}.zip">Download as .zip</a></p>
-    <p><a href="/repo/{{.RepoID}}/artifact/{{.ID}}.tar.gz">Download as .tar.gz</a></p>
+    <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">Download as .zip</a></p>
+    <p><a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">Download as .tar.gz</a></p>
 
     <h2>Files</h2>
     {{range .Files}}

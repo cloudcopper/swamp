@@ -24,10 +24,10 @@ func (c *Config) String() string {
 	s := ""
 	for k, repo := range c.Repos {
 		s += fmt.Sprintf("%v:\n", k)
-		if k == repo.ID {
-			s += fmt.Sprintf("    #ID: %v\n", repo.ID)
+		if k == repo.RepoID {
+			s += fmt.Sprintf("    #RepoID: %v\n", repo.RepoID)
 		} else {
-			s += fmt.Sprintf("    ID: %v\n", repo.ID)
+			s += fmt.Sprintf("    RepoID: %v\n", repo.RepoID)
 		}
 		s += fmt.Sprintf("    name: %v\n", repo.Name)
 		s += fmt.Sprintf("    description: %v\n", repo.Description)
@@ -114,19 +114,19 @@ func processReposConfigs(log ports.Logger, cfg *Config) *Config {
 		}
 
 		// Correct ID
-		if v.ID == "" {
-			v.ID = refRepoID
+		if v.RepoID == "" {
+			v.RepoID = refRepoID
 		}
-		v.ID = strings.ReplaceAll(string(v.ID), refRepoID, k)
-		log = log.With(slog.Any("repoID", v.ID))
-		if !lib.IsValidID(string(v.ID)) {
+		v.RepoID = strings.ReplaceAll(string(v.RepoID), refRepoID, k)
+		log = log.With(slog.Any("repoID", v.RepoID))
+		if !lib.IsValidID(string(v.RepoID)) {
 			log.Error("skip - invalid repo id")
 			continue
 		}
 
 		// Replace all entry of @refRepoID to ID
 		replaceRefRepoID := func(s string) string {
-			return strings.ReplaceAll(s, refRepoID, string(v.ID))
+			return strings.ReplaceAll(s, refRepoID, string(v.RepoID))
 		}
 		v.Name = replaceRefRepoID(v.Name)
 		v.Description = replaceRefRepoID(v.Description)

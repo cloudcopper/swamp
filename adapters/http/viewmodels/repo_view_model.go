@@ -6,7 +6,7 @@ import (
 )
 
 type Repo struct {
-	ID          models.RepoID
+	RepoID      models.RepoID
 	Name        string
 	Description string
 	Retention   types.Duration
@@ -17,7 +17,7 @@ type Repo struct {
 
 func NewRepo(repo *models.Repo) *Repo {
 	r := &Repo{
-		ID:          repo.ID,
+		RepoID:      repo.RepoID,
 		Name:        repo.Name,
 		Description: repo.Description,
 		Retention:   repo.Retention,

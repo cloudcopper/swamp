@@ -90,7 +90,7 @@ func (c *ArtifactController) DownloadZip(w http.ResponseWriter, r *http.Request)
 
 	// Set headers for zip file
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ID+".zip")
+	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ArtifactID+".zip")
 
 	// Create zip writer directly on the response writer
 	zipWriter := zip.NewWriter(w)
@@ -101,7 +101,7 @@ func (c *ArtifactController) DownloadZip(w http.ResponseWriter, r *http.Request)
 		if !func() (cont bool) {
 			fileName := modelFile.Name
 			filePath := filepath.Join(artifact.Storage, fileName)
-			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ArtifactID, fileName)
 			if err != nil {
 				c.renderFileError(w, artifact, "open file", filePath, err)
 				return
@@ -147,7 +147,7 @@ func (c *ArtifactController) DownloadGzip(w http.ResponseWriter, r *http.Request
 
 	// Set headers for tar.gz file
 	w.Header().Set("Content-Type", "application/gzip")
-	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ID+".tar.gz")
+	w.Header().Set("Content-Disposition", "attachment; filename="+artifact.ArtifactID+".tar.gz")
 
 	// Create gzip writer directly on the response writer
 	gzipWriter := gzip.NewWriter(w)
@@ -161,7 +161,7 @@ func (c *ArtifactController) DownloadGzip(w http.ResponseWriter, r *http.Request
 		if !func() (cont bool) {
 			fileName := modelFile.Name
 			filePath := filepath.Join(artifact.Storage, fileName)
-			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, fileName)
+			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ArtifactID, fileName)
 			if err != nil {
 				c.renderFileError(w, artifact, "open file", filePath, err)
 				return
@@ -231,7 +231,7 @@ func (c *ArtifactController) DownloadSingleFile(w http.ResponseWriter, r *http.R
 		func() {
 			// Open file
 			filePath := filepath.Join(artifact.Storage, filename)
-			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ID, filename)
+			file, err := c.aritfactStorage.OpenFile(artifact.Storage, artifact.ArtifactID, filename)
 			if err != nil {
 				c.renderFileError(w, artifact, "open file", filePath, err)
 				return
@@ -290,7 +290,7 @@ func (c *ArtifactController) renderServerError(w http.ResponseWriter, repoID mod
 }
 
 func (c *ArtifactController) renderFileError(w http.ResponseWriter, artifact *models.Artifact, op, filename string, err error) {
-	c.log.Error("file error", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("op", op), slog.Any("filename", filename), slog.Any("err", err))
+	c.log.Error("file error", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID), slog.Any("op", op), slog.Any("filename", filename), slog.Any("err", err))
 	type Data struct {
 		Artifact *models.Artifact
 		Op       string

@@ -11,18 +11,18 @@ import (
 )
 
 type Artifact struct {
-	RepoID    models.RepoID
-	ID        models.ArtifactID
-	Size      types.Size
-	State     vo.ArtifactState
-	IsOK      bool
-	IsBroken  bool
-	IsExpired bool
-	CreatedAt time.Time
-	ExpiredAt expiredTime
-	Checksum  string
-	Meta      models.ArtifactMetas
-	Files     models.ArtifactFiles
+	RepoID     models.RepoID
+	ArtifactID models.ArtifactID
+	Size       types.Size
+	State      vo.ArtifactState
+	IsOK       bool
+	IsBroken   bool
+	IsExpired  bool
+	CreatedAt  time.Time
+	ExpiredAt  expiredTime
+	Checksum   string
+	Meta       models.ArtifactMetas
+	Files      models.ArtifactFiles
 }
 
 type expiredTime time.Time
@@ -41,20 +41,20 @@ func NewArtifact(artifact *models.Artifact) *Artifact {
 		expiredAt = expiredTime(time.Unix(artifact.ExpiredAt, 0))
 	}
 	a := &Artifact{
-		RepoID:    artifact.RepoID,
-		ID:        artifact.ID,
-		Size:      artifact.Size,
-		State:     artifact.State,
-		IsOK:      artifact.State.IsOK(),
-		IsBroken:  artifact.State.IsBroken(),
-		IsExpired: artifact.State.IsExpired(),
-		CreatedAt: time.Unix(artifact.CreatedAt, 0),
-		ExpiredAt: expiredAt,
-		Checksum:  artifact.Checksum,
-		Meta:      artifact.Meta,
+		RepoID:     artifact.RepoID,
+		ArtifactID: artifact.ArtifactID,
+		Size:       artifact.Size,
+		State:      artifact.State,
+		IsOK:       artifact.State.IsOK(),
+		IsBroken:   artifact.State.IsBroken(),
+		IsExpired:  artifact.State.IsExpired(),
+		CreatedAt:  time.Unix(artifact.CreatedAt, 0),
+		ExpiredAt:  expiredAt,
+		Checksum:   artifact.Checksum,
+		Meta:       artifact.Meta,
 	}
 	for _, f := range artifact.Files {
-		f.Name = strings.TrimPrefix(f.Name, filepath.Join(artifact.Storage, artifact.ID)+string(filepath.Separator))
+		f.Name = strings.TrimPrefix(f.Name, filepath.Join(artifact.Storage, artifact.ArtifactID)+string(filepath.Separator))
 		base := filepath.Base(f.Name)
 		if base[0] == '_' || base[0] == '.' { // skip "hidden" files
 			continue

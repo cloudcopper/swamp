@@ -15,7 +15,7 @@ func startup(log ports.Logger, cfg *config.Config, bus ports.EventBus, repoRepos
 	// Create repo models
 	//
 	for k, repo := range cfg.Repos {
-		log := log.With(slog.String("config", k), slog.Any("repoID", repo.ID))
+		log := log.With(slog.String("config", k), slog.Any("repoID", repo.RepoID))
 
 		// Create repo model in repository
 		if err := repoRepository.Create(repo); err != nil {
@@ -23,7 +23,7 @@ func startup(log ports.Logger, cfg *config.Config, bus ports.EventBus, repoRepos
 			return lib.NewErrorCode(err, errors.RetCreateRepoRecordError)
 		}
 		// Emit event on repo model updated and input updated
-		bus.Pub(ports.TopicRepoUpdated, ports.Event{repo.ID})
+		bus.Pub(ports.TopicRepoUpdated, ports.Event{repo.RepoID})
 		bus.Pub(ports.TopicInputUpdated, ports.Event{repo.Input})
 	}
 

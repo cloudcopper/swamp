@@ -75,7 +75,7 @@ func (s *RepoService) checkRepoById(repoID models.RepoID) {
 }
 
 func (s *RepoService) checkRepoStorage(repo *models.Repo) {
-	log, fs := s.log.With(slog.Any("repoID", repo.ID)), afero.NewOsFs()
+	log, fs := s.log.With(slog.Any("repoID", repo.RepoID)), afero.NewOsFs()
 	log.Debug("check repo")
 
 	// TODO Abstract out storage!!!!
@@ -110,7 +110,7 @@ func (s *RepoService) checkRepoStorage(repo *models.Repo) {
 		// - we just starting up
 		// - it was manually written to storage
 		// - it was written by other instance or means
-		s.bus.Pub(ports.TopicDanglingRepoArtifact, ports.Event{repo.ID, artifactID})
+		s.bus.Pub(ports.TopicDanglingRepoArtifact, ports.Event{repo.RepoID, artifactID})
 		return true, nil
 	})
 }

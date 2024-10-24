@@ -164,7 +164,7 @@ func (s *ArtifactService) checkInputFile(repos []*models.Repo, f ports.FS, path 
 	return errors.ErrNotMatchRepoInput
 }
 func (s *ArtifactService) checkRepoInput(repo *models.Repo, f ports.FS, checksumFile string) error {
-	log := s.log.With(slog.Any("checksumFile", checksumFile), slog.Any("repoID", repo.ID))
+	log := s.log.With(slog.Any("checksumFile", checksumFile), slog.Any("repoID", repo.RepoID))
 
 	// Check the path is a good checksum
 	da := checksumDiskArtifact(log, f, checksumFile)
@@ -198,21 +198,21 @@ func (s *ArtifactService) checkRepoInput(repo *models.Repo, f ports.FS, checksum
 	expiredAt := createdAt + int64(repo.Retention/1000000000)
 	state := vo.ArtifactIsOK
 	artifact := &models.Artifact{
-		ID:        artifactID,
-		RepoID:    repo.ID,
-		Storage:   repo.Storage,
-		Size:      types.Size(info.Size),
-		State:     state,
-		CreatedAt: info.CreatedAt,
-		ExpiredAt: expiredAt,
-		Checksum:  string(da.checksum),
-		Meta:      meta,
-		Files:     files,
+		ArtifactID: artifactID,
+		RepoID:     repo.RepoID,
+		Storage:    repo.Storage,
+		Size:       types.Size(info.Size),
+		State:      state,
+		CreatedAt:  info.CreatedAt,
+		ExpiredAt:  expiredAt,
+		Checksum:   string(da.checksum),
+		Meta:       meta,
+		Files:      files,
 	}
 	if err := s.repositories.Artifact().Create(artifact); err != nil {
-		log.Error("unable create artifact record", slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+		log.Error("unable create artifact record", slog.Any("artifactID", artifact.ArtifactID), slog.Any("err", err))
 	}
-	s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+	s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ArtifactID})
 	return nil
 }
 
@@ -239,7 +239,7 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 		log.Error("unable to find artifact", slog.Any("err", err))
 		return
 	}
-	if artifact.ID == models.EmptyArtifactID {
+	if artifact.ArtifactID == models.EmptyArtifactID {
 		log.Info("dangling artifact")
 		expiredAt := da.createdAt + int64(repo.Retention/1000000000)
 		state := vo.ArtifactIsOK
@@ -252,16 +252,16 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 		files := da.getArtifactFiles(log)
 
 		artifact := &models.Artifact{
-			ID:        artifactID,
-			RepoID:    repoID,
-			Storage:   repo.Storage,
-			Size:      types.Size(da.size),
-			Checksum:  string(da.checksum),
-			State:     state,
-			CreatedAt: da.createdAt,
-			ExpiredAt: expiredAt,
-			Meta:      meta,
-			Files:     files,
+			ArtifactID: artifactID,
+			RepoID:     repoID,
+			Storage:    repo.Storage,
+			Size:       types.Size(da.size),
+			Checksum:   string(da.checksum),
+			State:      state,
+			CreatedAt:  da.createdAt,
+			ExpiredAt:  expiredAt,
+			Meta:       meta,
+			Files:      files,
 		}
 
 		if err := s.repositories.Artifact().Create(artifact); err != nil {
@@ -269,14 +269,14 @@ func (s *ArtifactService) checkRepoArtifact(repoID models.RepoID, artifactID mod
 			return
 		}
 		log.Info("artifact re-created")
-		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ArtifactID})
 		return
 	}
-	if artifact.ID != artifactID {
+	if artifact.ArtifactID != artifactID {
 		// This would be some serious issue
 		// We expect to read from artifact repository
 		// either requested ID not empty
-		log.Error("wrong artifact found", slog.Any("unexpected artifact id", artifact.ID))
+		log.Error("wrong artifact found", slog.Any("unexpected artifact id", artifact.ArtifactID))
 		return
 	}
 	if artifact.CreatedAt == da.createdAt && artifact.Checksum != da.checksum {
@@ -329,13 +329,13 @@ func (s *ArtifactService) markExpiredArtifacts(now int64) {
 
 	for _, artifact := range artifacts {
 		lib.Assert(!artifact.State.IsExpired())
-		log.Info("mark artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log.Info("mark artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID))
 		artifact.State |= vo.ArtifactIsExpired
 		err := s.repositories.Artifact().Update(artifact)
 		if err != nil {
-			log.Error("unable set artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+			log.Error("unable set artifact expired", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID), slog.Any("err", err))
 		}
-		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ArtifactID})
 	}
 }
 
@@ -348,11 +348,11 @@ func (s *ArtifactService) removeExpiredArtifacts(limit int) {
 	}
 
 	for _, artifact := range artifacts {
-		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID))
 		log.Info("remove expired artifact")
 		lib.Assert(artifact.State.IsExpired())
-		if err := s.artifactStorage.RemoveArtifact(artifact.Storage, artifact.ID); err != nil {
-			log.Error("artifact path remove failed", slog.Any("storage", artifact.Storage), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+		if err := s.artifactStorage.RemoveArtifact(artifact.Storage, artifact.ArtifactID); err != nil {
+			log.Error("artifact path remove failed", slog.Any("storage", artifact.Storage), slog.Any("artifactID", artifact.ArtifactID), slog.Any("err", err))
 		}
 		if err := s.repositories.Artifact().Delete(artifact); err != nil {
 			log.Error("artifact model delete failed", slog.Any("err", err))
@@ -381,8 +381,8 @@ func (s *ArtifactService) checkBrokenArtifacts(limit int, artifacts []*models.Ar
 }
 
 func (s *ArtifactService) checkBrokenArtifact(artifact *models.Artifact) {
-	log := s.log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
-	loc := filepath.Join(artifact.Storage, artifact.ID)
+	log := s.log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID))
+	loc := filepath.Join(artifact.Storage, artifact.ArtifactID)
 	da, err := s.verifyArtifactLocation(loc)
 	is_broken := false
 	if err != nil {
@@ -402,13 +402,13 @@ func (s *ArtifactService) checkBrokenArtifact(artifact *models.Artifact) {
 		is_broken = true
 	}
 	if is_broken {
-		log.Warn("mark artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log.Warn("mark artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID))
 		artifact.State |= vo.ArtifactIsBroken
 		err := s.repositories.Artifact().Update(artifact)
 		if err != nil {
-			log.Error("unable set artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID), slog.Any("err", err))
+			log.Error("unable set artifact broken", slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID), slog.Any("err", err))
 		}
-		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ID})
+		s.bus.Pub(ports.TopicArtifactUpdated, ports.Event{artifact.RepoID, artifact.ArtifactID})
 	}
 }
 
@@ -421,10 +421,10 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 	}
 
 	for _, artifact := range artifacts {
-		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ID))
+		log := log.With(slog.Any("repoID", artifact.RepoID), slog.Any("artifactID", artifact.ArtifactID))
 		log.Info("process broken artifact")
 		lib.Assert(artifact.State.IsBroken())
-		path := filepath.Join(artifact.Storage, artifact.ID)
+		path := filepath.Join(artifact.Storage, artifact.ArtifactID)
 
 		// detect the location for artifact to be moved to (or removed)
 		repo, err := s.repositories.Repo().FindByID(artifact.RepoID)
@@ -449,7 +449,7 @@ func (s *ArtifactService) removeBrokenArtifacts(limit int) {
 			}
 		}
 		if !remove {
-			newpath := filepath.Join(broken, fmt.Sprintf("%v-%v", repo.ID, artifact.ID))
+			newpath := filepath.Join(broken, fmt.Sprintf("%v-%v", repo.RepoID, artifact.ArtifactID))
 			log.Info("move broken artifact", slog.Any("path", path), slog.Any("newpath", newpath))
 			if err := lib.MoveFile(s.storageFs, path, s.brokenFs, newpath); err != nil {
 				log.Error("artifact path move failed", slog.Any("path", path), slog.Any("newpath", newpath), slog.Any("err", err))

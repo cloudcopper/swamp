@@ -39,7 +39,7 @@ func (r *ArtifactRepository) Create(model *models.Artifact) error {
 		}
 
 		// Modify the Repo.Size
-		err := db.Model(&models.Repo{}).Where("id = ?", model.RepoID).Update("size", gorm.Expr("size + ?", model.Size)).Error
+		err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("size", gorm.Expr("size + ?", model.Size)).Error
 		return err
 	})
 	return err
@@ -54,7 +54,7 @@ func (r *ArtifactRepository) Update(model *models.Artifact) error {
 func (r *ArtifactRepository) Delete(model *models.Artifact) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
 		// Modify the Repo.Size
-		if err := db.Model(&models.Repo{}).Where("id = ?", model.RepoID).Update("size", gorm.Expr("size - ?", model.Size)).Error; err != nil {
+		if err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("size", gorm.Expr("size - ?", model.Size)).Error; err != nil {
 			return err
 		}
 
@@ -94,7 +94,7 @@ func (r *ArtifactRepository) FindByID(repoID models.RepoID, artifactID models.Ar
 		}
 	}
 
-	err := db.First(&artifact, models.Artifact{ID: artifactID, RepoID: repoID}).Error
+	err := db.First(&artifact, models.Artifact{ArtifactID: artifactID, RepoID: repoID}).Error
 	artifact.Files.Sort(artifact.Storage)
 	return artifact, err
 }

@@ -11,7 +11,7 @@ type RepoID = string
 const EmptyRepoID = RepoID("")
 
 type Repo struct {
-	ID          RepoID         `gorm:"primaryKey;not null" validate:"required,validid"`
+	RepoID      RepoID         `gorm:"primaryKey;not null" validate:"required,validid"`
 	Name        string         `gorm:"uniqueIndex;not null;column:name" validate:"required"`
 	Description string         `gorm:"string"`
 	Input       string         `gorm:"index" validate:"required,min=3,dir,abspath"`
@@ -31,10 +31,10 @@ func (model *Repo) Validate(val *validator.Validate) error {
 
 	for _, m := range model.Meta {
 		if m.RepoID == "" {
-			m.RepoID = model.ID
+			m.RepoID = model.RepoID
 			continue
 		}
-		if m.RepoID != model.ID {
+		if m.RepoID != model.RepoID {
 			return errors.ErrIncorrectMetaID
 		}
 	}

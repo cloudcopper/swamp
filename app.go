@@ -115,7 +115,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	router := http.NewRouter(log)
 	// Create render object
 	// It also loads templates
-	render := infra.NewRender(fs)
+	render := infra.NewRender(fs, "layout")
 	// Create controllers
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)

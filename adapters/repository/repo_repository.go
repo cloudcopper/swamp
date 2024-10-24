@@ -99,7 +99,7 @@ func (r *RepoRepository) FindByID(id models.RepoID, flags ...interface{}) (*mode
 		}
 	}
 
-	err := db.First(&repo, models.Repo{ID: id}).Error
+	err := db.First(&repo, models.Repo{RepoID: id}).Error
 	lib.Assert(len(repo.Artifacts) == 0 || repo.Size > 0)
 	return repo, err
 }
