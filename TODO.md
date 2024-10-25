@@ -13,7 +13,6 @@ CUSTOM.md - how to customize
 - nicer ui
 -- main page - shameless swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short. Has way to download latest artifact from repo view and from artifact view.
 -- repo page - repo summary and meta, repo artifacts summary, artifacts (pagination? calendar separation? meta search?)
--- artifact page - artifact details, files and their status, metas, meta filters
 -- broken artifact warning page/mechanism ? should prohibit from simplest curl/wget downloads - sort of requires random URL instead valid file name?
 - more nicer ui
 -- meta values colorization humanization (i.e. automatically shows as symlink https:// and etc)
@@ -36,3 +35,6 @@ CUSTOM.md - how to customize
 - uber fx or google wire ???
 
 - archetypes for different artifacts/repos???
+
+- meta filter at the page
+- meta search
