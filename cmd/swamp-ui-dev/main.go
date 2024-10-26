@@ -194,19 +194,7 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 
 		meta := models.RepoMetas{}
 		for a := 0; a < rv(numRepoMetas); a++ {
-			tld := []string{"com", "org", "net"}
-			name, value := rw(numRepoMetaNames), ""
-			switch rs([]string{"text", "http://", "https://", "mailto:"}) {
-			case "text":
-				value = rw(numRepoMetaValueTexts)
-				value = strings.ToUpper(value[:1]) + value[1:]
-			case "http://":
-				value = "http://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
-			case "https://":
-				value = "https://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
-			case "mailto:":
-				value = "mailto:" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "@" + strings.ReplaceAll(rw([]int{1, 2}), " ", ".") + "." + rs(tld)
-			}
+			name, value := randomMeta()
 			meta = append(meta, &models.RepoMeta{
 				RepoID: repoID,
 				Key:    name,
@@ -238,9 +226,10 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 
 			meta := []*models.ArtifactMeta{}
 			for x := 0; x < rv([]int{5, 100}); x++ {
+				name, value := randomMeta()
 				m := &models.ArtifactMeta{
-					Key:   strings.ToUpper(strings.ReplaceAll(rw([]int{1, 3}), " ", "_")),
-					Value: rw([]int{1, 5}),
+					Key:   strings.ToUpper(strings.ReplaceAll(name, " ", "_")),
+					Value: value,
 				}
 				meta = append(meta, m)
 			}
@@ -382,6 +371,23 @@ func getArtifactFiles(checksum string, createdAt int64) models.ArtifactFiles {
 		})
 
 	return files
+}
+
+func randomMeta() (key, value string) {
+	tld := []string{"com", "org", "net"}
+	name, value := rw(numRepoMetaNames), ""
+	switch rs([]string{"text", "http://", "https://", "mailto:"}) {
+	case "text":
+		value = rw(numRepoMetaValueTexts)
+		value = strings.ToUpper(value[:1]) + value[1:]
+	case "http://":
+		value = "http://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
+	case "https://":
+		value = "https://" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "." + rs(tld) + "/" + strings.ReplaceAll(rw([]int{0, 4}), " ", "/")
+	case "mailto:":
+		value = "mailto:" + strings.ReplaceAll(rw([]int{1, 3}), " ", ".") + "@" + strings.ReplaceAll(rw([]int{1, 2}), " ", ".") + "." + rs(tld)
+	}
+	return name, value
 }
 
 var fakeStorage = &FakeStorage{

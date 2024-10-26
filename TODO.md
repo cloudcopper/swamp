@@ -1,5 +1,9 @@
 TODO
 ====
+- nicer ui
+-- main page - shameless swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short. Has way to download latest artifact from repo view and from artifact view.
+-- error pages
+
 - broken artifacts shall not be possible to download within single click/direct url
 - broken files shall not be possible to download within single click/direct url
 -- figure out how to make it complex for automation - i.e. present link with some random value instead of normal artifact id
@@ -11,14 +15,11 @@ TODO
 CUSTOM.md - how to customize
 
 - nicer ui
--- main page - shameless swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short. Has way to download latest artifact from repo view and from artifact view.
--- repo page - repo summary and meta, repo artifacts summary, artifacts (pagination? calendar separation? meta search?)
--- broken artifact warning page/mechanism ? should prohibit from simplest curl/wget downloads - sort of requires random URL instead valid file name?
-- more nicer ui
--- meta values colorization humanization (i.e. automatically shows as symlink https:// and etc)
--- custom 404 ?
+-- main page - artifacts pagination? 
+-- repo page - artifacts pagination? calendar separation?
+-- about page ?
 
-- tests - increate test coverage
+- tests - increase test coverage
 
 - handle manual artifact removal from artifact storage
 - handle manual artifact adding to artifact storage
@@ -38,3 +39,5 @@ CUSTOM.md - how to customize
 
 - meta filter at the page
 - meta search
+
+- custom renderer for more idiomatic layout support in html/template ?

@@ -19,7 +19,7 @@ require (
 	github.com/samber/slog-chi v1.11.1
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.9.0
-	github.com/unrolled/render v1.6.1
+	github.com/unrolled/render v1.7.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.5.6

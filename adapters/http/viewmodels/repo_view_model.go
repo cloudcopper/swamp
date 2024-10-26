@@ -9,6 +9,9 @@ type Repo struct {
 	RepoID      models.RepoID
 	Name        string
 	Description string
+	Input       string
+	Storage     string
+	Broken      string
 	Retention   types.Duration
 	Size        types.Size
 	Meta        models.RepoMetas
@@ -20,6 +23,9 @@ func NewRepo(repo *models.Repo) *Repo {
 		RepoID:      repo.RepoID,
 		Name:        repo.Name,
 		Description: repo.Description,
+		Input:       repo.Input,
+		Storage:     repo.Storage,
+		Broken:      repo.Broken,
 		Retention:   repo.Retention,
 		Size:        repo.Size,
 		Meta:        repo.Meta,
