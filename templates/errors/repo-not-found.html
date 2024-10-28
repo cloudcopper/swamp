@@ -1,0 +1,21 @@
+<div class="modal is-active">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head has-background-danger">
+            <p class="modal-card-title">404 - Repository Not Found!!!</p>
+        </header>
+        <section class="modal-card-body">
+            <p>The repository with ID <a href="/repo/{{.RepoID}}">{{.RepoID}}</a> could not be located.</p>
+            <p>Please verify the repository ID and try again, or contact support if the issue persists.</p>            
+            {{if .Error}}
+            <br/>
+            <p>Error: <strong>{{.Error}}</strong></p>
+            {{end}}
+        </section>
+        <footer class="modal-card-foot">
+            <div class="buttons">
+                <a href="/"><button class="button is-info">Return to home</button></a>
+            </div>
+        </footer>
+    </div>
+</div>

@@ -6,7 +6,6 @@ import (
 
 	"github.com/cloudcopper/swamp/adapters/http/viewmodels"
 	"github.com/cloudcopper/swamp/domain"
-	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/ports"
@@ -49,12 +48,12 @@ func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Errors        []string
 		Repos         []*viewmodels.Repo
-		Artifacts     []*models.Artifact
+		Artifacts     []*viewmodels.Artifact
 		ArtifactsPage int
 	}{
 		Errors:        errors,
 		Repos:         viewmodels.NewRepos(repos),
-		Artifacts:     artifacts,
+		Artifacts:     viewmodels.NewArtifacts(artifacts),
 		ArtifactsPage: artifactsPage,
 	}
 
@@ -64,5 +63,5 @@ func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 // NotFound is a custom 404 handler
 func (c *FrontPageController) NotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
-	c.render.HTML(w, http.StatusNotFound, "404", nil)
+	c.render.HTML(w, http.StatusNotFound, "errors/404", nil)
 }

@@ -1,0 +1,57 @@
+{{define "swamp-intro-text"}}
+    <p>
+        Swamp is a streamlined artifact storage solution designed for simplicity and
+        efficiency, eliminating the need for an external database. It supports an 
+        trivial UI and easily manages artifacts with customizable configurations.
+        By using a YAML configuration file with anchors and aliases, Swamp lets users 
+        manage their artifacts through a minimal, directory-based setup, with support for 
+        metadata, retention policies, and validation.
+    </p>
+    <p>
+        With Swamp, teams can set up a fully functional artifact repository with just a 
+        few commands, making it ideal for projects where fast, straightforward storage 
+        is key. Swamp continually monitors project directories for new artifacts and 
+        automates key processes like artifact detection, checksum verification, and metadata updates.
+    </p>
+    <p>
+        Uploading artifacts to Swamp is straightforward and can be done using standard file 
+        operations like <code>scp</code>, <code>rsync</code>, or any other file transfer method. 
+        Once files are copied to the designated project input directory, Swamp automatically 
+        detects new artifacts, verifies checksums, and updates metadata, ensuring that artifact
+        management remains efficient and hassle-free. This flexibility allows seamless integration
+        with existing workflows, making Swamp a versatile choice for any project.
+    </p>
+    <p>
+        Swamp is evolving to include new features that will expand its functionality and versatility.
+        Upcoming releases are set to introduce web-based artifact upload capabilities, providing a more
+        interactive experience similar to other artifact storage vendors. Additionally, Swamp is
+        exploring support for alternative storage backends beyond the filesystem, with potential
+        integrations for popular cloud storage solutions and database-backed repositories. These
+        enhancements aim to make Swamp even more adaptable, catering to a wider range of project
+        needs and deployment environments.                
+    </p>
+    {{if .Repos}}
+    {{else}}
+    {{end}}
+    <p>
+        It seems you have no repo configured yet. To get started with your first repository in Swamp,
+        simply create a YAML configuration file named <code>swamp_repos.yml</code> in your project
+        directory. Each repository entry should include basic fields like <code>name</code>,
+        <code>description</code>, <code>input</code>, and <code>storage</code>. For example,
+        define your first repository with a structure like:
+    </p>
+    <pre><code>
+    project-id:
+        name:        "Project Name"
+        description: "Project description text text text"
+        input:       /home/user/jenkins/swamp/project-id/
+        storage:     /var/lib/swamp/project-id/
+        retention:   1h
+    </code></pre>
+    <p>
+        In this example, <code>input</code> is the directory where artifacts will be placed for
+        Swamp to monitor, and <code>storage</code> is the destination for validated artifacts.
+        After creating this configuration, save the file, restart Swamp, and it will begin tracking
+        artifacts in your newly set up repository. Refresh the web UI to see your first repo in action!
+    </p>
+{{end}}

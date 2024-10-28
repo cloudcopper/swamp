@@ -15,7 +15,7 @@ type Render = *render.Render
 func NewRender(f fs.FS, layout string) Render {
 	opts := render.Options{
 		FileSystem: render.FS(f),
-		Extensions: []string{".html"},
+		Extensions: []string{".tmpl", ".html"},
 		Layout:     layout,
 		Funcs: []template.FuncMap{
 			{

@@ -120,8 +120,10 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, artifactStorage)
+	aboutPageController := controllers.NewAboutPageController(log, render)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	router.Get("/about", aboutPageController.Index)
 	router.Get("/repo/{repoID}/artifact/{artifactID}/file/*", artifactController.DownloadSingleFile)
 	// WARN Next two routes are more like documentation as those are not working
 	// Please see https://github.com/go-chi/chi/issues/758 and related

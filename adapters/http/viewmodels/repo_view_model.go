@@ -39,8 +39,8 @@ func NewRepo(repo *models.Repo) *Repo {
 
 func NewRepos(repos []*models.Repo) []*Repo {
 	a := []*Repo{}
-	for _, r := range repos {
-		a = append(a, NewRepo(r))
+	for _, repo := range repos {
+		a = append(a, NewRepo(repo))
 	}
 	return a
 }

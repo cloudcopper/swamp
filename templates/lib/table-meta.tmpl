@@ -1,0 +1,10 @@
+{{define "table-meta-rows"}}
+    {{if .Meta}}
+    {{range .Meta}}
+    <tr>
+        <td>{{.Key}}</td>
+        <td>{{if isHref .Value }}<a href="{{.Value}}">{{.Value}}</a>{{else}}{{.Value}}{{end}}</td>
+    </tr>
+    {{end}}
+    {{end}}
+{{end}}

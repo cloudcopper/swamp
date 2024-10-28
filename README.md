@@ -7,6 +7,7 @@ Swamp - Only minimalistic artifacts storage
 - Artifacts retention
 - Artifacts validation
 - Artifacts metadata
+- Repo metadata
 
 Quick start
 -----------

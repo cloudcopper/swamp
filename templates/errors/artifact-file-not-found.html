@@ -1,0 +1,19 @@
+<div class="modal is-active">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head has-background-danger">
+            <p class="modal-card-title">404 - File not found!!!</p>
+        </header>
+        <section class="modal-card-body">
+            <p>File <strong>{{.Filename}}</strong> not found
+               in repository <a href="/repo/{{.Artifact.RepoID}}">{{.Artifact.RepoID}}</a>,
+               artifact <a href="/repo/{{.Artifact.RepoID}}/artifact/{{.Artifact.ArtifactID}}">{{.Artifact.ArtifactID}}</a>.</p>
+            <p>Please check the details and try again, or contact support if the issue persists.</p>
+        </section>
+        <footer class="modal-card-foot">
+            <div class="buttons">
+                <a href="/"><button class="button is-info">Return to home</button></a>
+            </div>            
+        </footer>
+    </div>
+</div>

@@ -50,7 +50,7 @@ func (c *RepoController) renderRepoNotFound(w http.ResponseWriter, repoID models
 		RepoID models.RepoID
 		Error  error
 	}
-	c.render.HTML(w, http.StatusNotFound, "repo-not-found", Data{repoID, err})
+	c.render.HTML(w, http.StatusNotFound, "errors/repo-not-found", Data{repoID, err})
 }
 
 func (c *RepoController) renderServerError(w http.ResponseWriter, repoID models.RepoID, err error) {
@@ -58,5 +58,5 @@ func (c *RepoController) renderServerError(w http.ResponseWriter, repoID models.
 		RepoID models.RepoID
 		Error  error
 	}
-	c.render.HTML(w, http.StatusInternalServerError, "repo-server-error", Data{repoID, err})
+	c.render.HTML(w, http.StatusInternalServerError, "errors/repo-server-error", Data{repoID, err})
 }

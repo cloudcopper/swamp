@@ -28,6 +28,8 @@ func NewRepoRepository(db ports.DB, f ports.FS) (*RepoRepository, error) {
 
 func (r *RepoRepository) Create(model *models.Repo) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
+		model.Meta.Secure()
+
 		if err := model.Validate(r.validator); err != nil {
 			return fmt.Errorf("invalid repo object: %w", err)
 		}

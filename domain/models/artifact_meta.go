@@ -15,3 +15,17 @@ func (model *ArtifactMeta) Validate() error {
 	err := lib.Validate.Struct(model)
 	return err
 }
+
+func (metas *ArtifactMetas) Secure() {
+	a := ArtifactMetas{}
+	for _, m := range *metas {
+		if lib.IsKeyBlacklisted(m.Key) {
+			continue
+		}
+		if lib.IsKeyValueBlacklisted(m.Key) {
+			m.Value = "********************************"
+		}
+		a = append(a, m)
+	}
+	*metas = a
+}

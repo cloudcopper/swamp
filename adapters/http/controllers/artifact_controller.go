@@ -263,7 +263,7 @@ func (c *ArtifactController) renderFileNotFound(w http.ResponseWriter, artifact 
 		Artifact *models.Artifact
 		Filename string
 	}
-	c.render.HTML(w, http.StatusNotFound, "file-not-found", Data{artifact, filename})
+	c.render.HTML(w, http.StatusNotFound, "errors/artifact-file-not-found", Data{artifact, filename})
 }
 
 func (c *ArtifactController) renderArtifactNotFound(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, err error) {
@@ -272,7 +272,7 @@ func (c *ArtifactController) renderArtifactNotFound(w http.ResponseWriter, repoI
 		ArtifactID models.ArtifactID
 		Error      error
 	}
-	c.render.HTML(w, http.StatusNotFound, "artifact-not-found", Data{repoID, artifactID, err})
+	c.render.HTML(w, http.StatusNotFound, "errors/artifact-not-found", Data{repoID, artifactID, err})
 }
 
 func (c *ArtifactController) renderServerError(w http.ResponseWriter, repoID models.RepoID, artifactID models.ArtifactID, err error) {
@@ -281,7 +281,7 @@ func (c *ArtifactController) renderServerError(w http.ResponseWriter, repoID mod
 		ArtifactID models.ArtifactID
 		Error      error
 	}
-	c.render.HTML(w, http.StatusInternalServerError, "artifact-server-error", Data{repoID, artifactID, err})
+	c.render.HTML(w, http.StatusInternalServerError, "errors/artifact-server-error", Data{repoID, artifactID, err})
 }
 
 func (c *ArtifactController) renderFileError(w http.ResponseWriter, artifact *models.Artifact, op, filename string, err error) {
@@ -292,5 +292,5 @@ func (c *ArtifactController) renderFileError(w http.ResponseWriter, artifact *mo
 		Filename string
 		Error    error
 	}
-	c.render.HTML(w, http.StatusInternalServerError, "artifact-file-error", Data{artifact, op, filename, err})
+	c.render.HTML(w, http.StatusInternalServerError, "errors/artifact-file-error", Data{artifact, op, filename, err})
 }

@@ -1,0 +1,78 @@
+{{define "table-artifacts"}}
+    {{if .Artifacts}}
+    <table>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Artifact</th>
+                <th>Size</th>
+                <th>Created</th>
+                <th>Expired</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Artifacts}}
+            {{template "table-artifacts-row" .}}
+            {{end}}
+        </tbody>
+    </table>
+    {{end}}
+{{end}}
+
+{{define "table-artifacts-row"}}
+    <tr>
+        {{if eq .State 0}}
+        <td>
+            <i class="fa-solid fa-square-check has-text-success"></i>
+        </td>
+        {{else if eq .State 2}}
+        <td class="has-tooltip-arrow has-tooltip-left has-tooltip-warning" data-tooltip="Artifact is expired">
+            <i class="fa-solid fa-hourglass-end has-text-warning"></i>
+        </td>
+        {{else}}
+        <td class="has-tooltip-arrow has-tooltip-left has-tooltip-danger" data-tooltip="Artifact is broken!!!">
+            <i class="fa-solid fa-square-xmark has-text-danger"></i>
+        </td>
+        {{end}}
+        <td>
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}"><i class="fas fa-puzzle-piece"></i>&nbsp;{{.ArtifactID}}</a><br/>
+            {{if eq .State 0}}
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">
+                <button class="button is-success">
+                    <i class="fa-brands fa-windows"></i>&nbsp;Download .zip
+                </button>
+            </a>
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">
+                <button class="button is-success">
+                    <i class="fa-brands fa-linux"></i>&nbsp;Download .tar.gz
+                </button>
+            </a>
+            {{else if eq .State 2}}
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">
+                <button class="button is-warning">
+                    <i class="fa-brands fa-windows"></i>&nbsp;Download .zip
+                </button>
+            </a>
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">
+                <button class="button is-warning">
+                    <i class="fa-brands fa-linux"></i>&nbsp;Download .tar.gz
+                </button>
+            </a>
+            {{else}}
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.zip">
+                <button class="button is-danger">
+                    <i class="fa-brands fa-windows"></i>&nbsp;Download .zip
+                </button>
+            </a>
+            <a href="/repo/{{.RepoID}}/artifact/{{.ArtifactID}}.tar.gz">
+                <button class="button is-danger">
+                    <i class="fa-brands fa-linux"></i>&nbsp;Download .tar.gz
+                </button>
+            </a>
+            {{end}}
+        </td>
+        <td>{{.Size}}</td>
+        <td>{{.CreatedAt}}</td>
+        <td>{{.ExpiredAt}}</td>
+    </tr>
+{{end}}

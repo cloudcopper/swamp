@@ -150,8 +150,10 @@ func app(log *slog.Logger) error {
 	frontPageController := controllers.NewFrontPageController(log, render, repositories)
 	repoContoller := controllers.NewRepoController(log, render, repoRepository)
 	artifactController := controllers.NewArtifactController(log, render, artifactRepository, fakeStorage)
+	aboutPageController := controllers.NewAboutPageController(log, render)
 	// Add routes
 	router.Get("/", frontPageController.Index)
+	router.Get("/about", aboutPageController.Index)
 	router.Get("/repo/{repoID}/artifact/{artifactID}/file/*", artifactController.DownloadSingleFile)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.tar.gz", artifactController.DownloadGzip)
 	router.Get("/repo/{repoID}/artifact/{artifactID}.zip", artifactController.DownloadZip)
@@ -233,6 +235,19 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 				}
 				meta = append(meta, m)
 			}
+			// add secret/password simulation entry to be able test blacklisting
+			meta = append(meta, []*models.ArtifactMeta{
+				{
+					Key:   strings.ToUpper(random.Word()) + "_PASSWORD", // The 'PASSWORD' shall blacklist value
+					Value: random.Word(),
+				},
+				{
+					Key:   "SECRET_" + strings.ToUpper(random.Word()), // The 'SECRET' shall blacklist value
+					Value: random.Words([]int{2, 4}),
+				}, {
+					Key:   "_" + strings.ToUpper(strings.ReplaceAll(name, " ", "_")), // The ^_ shall blacklist key/value
+					Value: random.Words([]int{2, 4}),
+				}}...)
 
 			createdAt := int64(rv([]int{0, int(time.Now().UTC().Unix())}))
 			expiredAt := createdAt + int64(repo.Retention/1000000000)
@@ -339,12 +354,12 @@ func getArtifactFiles(checksum string, createdAt int64) models.ArtifactFiles {
 			State: vo.ArtifactState(random.Element([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1})),
 		}
 		countGeneratedFile++
-		if countGeneratedFile%(numFiles[1]*3/2) == 0 {
+		if countGeneratedFile%(numFiles[1]/6) == 0 {
 			// break file name
 			// the FakeStorage.OpenFile will return error on file with 'bad'
 			// so we can simulate cases when file is "broken"
 			file.Name += "bad.txt"
-		} else if countGeneratedFile%(numFiles[1]) == 0 {
+		} else if countGeneratedFile%(numFiles[1]/5) == 0 {
 			// break file name
 			// the FakeStorage.OpenFile may return error on file with 'flacky'
 			// so we can simulate cases when file is "broken" randomly

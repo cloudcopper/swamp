@@ -9,38 +9,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@creativebulma/bulma-tooltip@1.2.0/dist/bulma-tooltip.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <style>
-    .is-equal-height {
-        /* keep cards equal height */
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-
-    .card-footer {
-        /* keep card footer at bottom */
-        margin-top: auto;
-    }
-
-    .to-bottom {
-        /* keep last div at bottom of parent div.is-equal-height */
-        margin-top: auto;
-    }
-
     .hero {
         margin-top: 0.1rem;
     }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/timeago.js/4.0.2/timeago.min.js"></script>
-    <script>
-    // Initialize timeago.js for all elements with class "timeago"
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.timeago').forEach(function (element) {
-        var epochTimestamp = element.getAttribute('data-time');
-        var date = new Date(epochTimestamp * 1000); // convert epoch to milliseconds
-        element.innerText = timeago.format(date);
-        });
-    });
-    </script>
 </head>
 <body>
     <!-- Navigation Bar -->
@@ -59,13 +31,7 @@
         </div>
       </div>
     </nav>
-    <section class="section">
-        <div class="container">
-            <div class="box">    
-                {{ yield }}
-            </div>
-        </div>
-    </section>
+    {{ yield }}
     <!-- Footer -->
     <footer class="footer has-background-info">
         <div class="content has-text-centered">

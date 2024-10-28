@@ -63,3 +63,11 @@ func NewArtifact(artifact *models.Artifact) *Artifact {
 	}
 	return a
 }
+
+func NewArtifacts(artifacts []*models.Artifact) []*Artifact {
+	a := []*Artifact{}
+	for _, artifact := range artifacts {
+		a = append(a, NewArtifact(artifact))
+	}
+	return a
+}

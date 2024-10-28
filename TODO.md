@@ -1,8 +1,8 @@
 TODO
 ====
-- nicer ui
--- main page - shameless swamp promo (some backlink to gh and latest release?), instance summary, repos in short, and latest artifacts in short. Has way to download latest artifact from repo view and from artifact view.
--- error pages
+- better configuration (atm params dropped here and there and it wont works well with proper DI)
+- CUSTOM.md - how to customize
+- Correct swamp-intro and readme
 
 - broken artifacts shall not be possible to download within single click/direct url
 - broken files shall not be possible to download within single click/direct url
@@ -10,9 +10,8 @@ TODO
 
 - layered fs with afero instead of custom?
 
-- better configuration (atm params dropped here and there and it wont works well with proper DI)
-
-CUSTOM.md - how to customize
+- models.Repo.AritfactsCount (needed of we would like to have pagination working faster)
+- front page artifacts limit(1) to speed up
 
 - nicer ui
 -- main page - artifacts pagination? 
@@ -29,9 +28,6 @@ CUSTOM.md - how to customize
 - abstract out storage
 -- currently it is filesystem but may it be more flexible? minio?
 
-- blacklist for meta keys
-- blacklist for meta values - i.e *PASSWORD* should be *************
-
 - gorm -> goent ???
 - uber fx or google wire ???
 
@@ -39,5 +35,3 @@ CUSTOM.md - how to customize
 
 - meta filter at the page
 - meta search
-
-- custom renderer for more idiomatic layout support in html/template ?

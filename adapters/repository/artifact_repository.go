@@ -29,6 +29,8 @@ func NewArtifactRepository(db ports.DB, f ports.FS) (*ArtifactRepository, error)
 
 func (r *ArtifactRepository) Create(model *models.Artifact) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
+		model.Meta.Secure()
+
 		if err := model.Validate(r.validator); err != nil {
 			return fmt.Errorf("invalid artifact object: %w", err)
 		}

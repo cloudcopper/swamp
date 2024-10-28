@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/cloudcopper/swamp/lib"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,4 +26,18 @@ func (meta *RepoMetas) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	return nil
+}
+
+func (metas *RepoMetas) Secure() {
+	a := RepoMetas{}
+	for _, m := range *metas {
+		if lib.IsKeyBlacklisted(m.Key) {
+			continue
+		}
+		if lib.IsKeyValueBlacklisted(m.Key) {
+			m.Value = "********************************"
+		}
+		a = append(a, m)
+	}
+	*metas = a
 }
