@@ -41,7 +41,11 @@ func (r *ArtifactRepository) Create(model *models.Artifact) error {
 		}
 
 		// Modify the Repo.Size
-		err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("size", gorm.Expr("size + ?", model.Size)).Error
+		if err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("size", gorm.Expr("size + ?", model.Size)).Error; err != nil {
+			return err
+		}
+		// Modify the Repo.ArtifactsCount
+		err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("artifacts_count", gorm.Expr("artifacts_count + ?", 1)).Error
 		return err
 	})
 	return err
@@ -57,6 +61,10 @@ func (r *ArtifactRepository) Delete(model *models.Artifact) error {
 	err := r.db.Transaction(func(db *gorm.DB) error {
 		// Modify the Repo.Size
 		if err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("size", gorm.Expr("size - ?", model.Size)).Error; err != nil {
+			return err
+		}
+		// Modify the Repo.ArtifactsCount
+		if err := db.Model(&models.Repo{}).Where("repo_id = ?", model.RepoID).Update("artifacts_count", gorm.Expr("artifacts_count - ?", 1)).Error; err != nil {
 			return err
 		}
 

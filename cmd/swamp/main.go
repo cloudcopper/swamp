@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"log/slog"
 	"os"
 
@@ -20,19 +21,28 @@ const (
 var fs embed.FS
 
 func main() {
-	//
 	// Use config file name from env SWAMP_REPO_CONFIG
 	// or swamp_repos.yml
 	// Note the config file might be embedded!!!
-	//
-	const defaultReposConfigFileName = "swamp_repos.yml"
-	config.ReposConfigFileName = lib.GetEnvDefault("SWAMP_REPO_CONFIG", defaultReposConfigFileName)
+	config.ReposConfigFileName = lib.GetEnvDefault("SWAMP_REPO_CONFIG", config.ReposConfigFileName)
 
 	// The first filesystem layer location (nothing if empty)
-	config.TopRootFileSystemPath = lib.GetEnvDefault("SWAMP_ROOT", "")
+	config.TopRootFileSystemPath = lib.GetEnvDefault("SWAMP_ROOT", config.TopRootFileSystemPath)
 	// Second layer is current working dir
 	// Third layer is this app embed fs
 	// Last layer is the swamp own embed fs
+
+	// Handle command line arguments
+	flag.StringVar(&config.Listen, "listen", config.Listen, "web server listen address")
+	flag.StringVar(&config.ReposConfigFileName, "repos", config.ReposConfigFileName, "repos config file name")
+	flag.StringVar(&config.TopRootFileSystemPath, "root", config.TopRootFileSystemPath, "first layer of filesystem (optional)")
+	flag.DurationVar(&config.TimerExpiredStart, "exp-start", config.TimerExpiredStart, "expired start timer")
+	flag.DurationVar(&config.TimerExpiredInterval, "exp-interval", config.TimerExpiredInterval, "expired check interval")
+	flag.IntVar(&config.TimerExpiredLimit, "exp-limit", config.TimerExpiredLimit, "expired check limit")
+	flag.DurationVar(&config.TimerBrokenStart, "broken-start", config.TimerBrokenStart, "broken start timer")
+	flag.DurationVar(&config.TimerBrokenInterval, "broken-interval", config.TimerBrokenInterval, "broken check interval")
+	flag.IntVar(&config.TimerBrokenLimit, "broken-limit", config.TimerBrokenLimit, "broken check limit")
+	flag.Parse()
 
 	//
 	// Create logger

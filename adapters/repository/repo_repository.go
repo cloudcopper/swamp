@@ -44,32 +44,60 @@ func (r *RepoRepository) Create(model *models.Repo) error {
 
 func (r *RepoRepository) FindAll(flags ...interface{}) ([]*models.Repo, error) {
 	var repos []*models.Repo
-	db := r.db.Order("name ASC")
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		db := tx.Order("name ASC")
 
-	for _, flag := range flags {
-		switch v := flag.(type) {
-		case ports.WithRelationship:
-			if !v {
-				continue
+		limitArtifacts := -1 // -1 - no limit
+		withRelationship := false
+		for _, flag := range flags {
+			switch v := flag.(type) {
+			case ports.LimitArtifacts:
+				limitArtifacts = int(v)
+			case ports.WithRelationship:
+				withRelationship = bool(v)
+			default:
+				panic(flag)
 			}
+		}
+
+		if withRelationship && limitArtifacts == -1 {
 			db = db.Preload("Meta", func(db ports.DB) ports.DB {
 				return db.Order("key ASC")
 			})
-			db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
-				return db.Order("created_at DESC")
-			})
-			db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
-				return db.Order("key ASC")
-			})
-		default:
-			panic(flag)
+			if limitArtifacts != -1 { // We have to use alternative way to obtain limited number of related models
+				db = db.Preload("Artifacts", func(db ports.DB) ports.DB {
+					db = db.Order("created_at DESC")
+					return db
+				})
+				db = db.Preload("Artifacts.Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
+				})
+			}
 		}
-	}
 
-	err := db.Find(&repos).Error
-	for _, r := range repos {
-		lib.Assert(len(r.Artifacts) == 0 || r.Size > 0)
-	}
+		if err := db.Find(&repos).Error; err != nil {
+			return err
+		}
+
+		if withRelationship && limitArtifacts != -1 {
+			for _, r := range repos {
+				db := tx.Order("created_at DESC")
+				db = db.Limit(limitArtifacts)
+				db = db.Preload("Meta", func(db ports.DB) ports.DB {
+					return db.Order("key ASC")
+				})
+				if err := db.Where("repo_id = ?", r.RepoID).Find(&r.Artifacts).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		for _, r := range repos {
+			lib.Assert((r.ArtifactsCount == 0 && r.Size == 0) || (r.ArtifactsCount > 0 && r.Size > 0))
+		}
+
+		return nil
+	})
 
 	return repos, err
 }

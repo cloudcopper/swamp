@@ -28,7 +28,7 @@ done
 #
 # Start swamp in background
 #
-TOP="${TOP}" SWAMP_REPO_CONFIG="${TOP}/six-repos.yml" ${SWAMP} | tee swamp.log &
+TOP="${TOP}" ${SWAMP} -repos="six-repos.yml" | tee swamp.log &
 SWAMP_PID=$!
 sleep 1
 kill -0 ${SWAMP_PID} || exit 1

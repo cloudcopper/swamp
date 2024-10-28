@@ -127,6 +127,7 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.Equal(testRepoID, repoModel.RepoID)
 		assert.NotZero(repoModel.Size)
 		assert.Len(repoModel.Artifacts, 1)
+		assert.Equal(len(repoModel.Artifacts), repoModel.ArtifactsCount)
 
 		// ...artifactModel propely created
 		artifactModel := repoModel.Artifacts[0]
@@ -196,6 +197,8 @@ func TestArtifactServiceScenario1(t *testing.T) {
 		assert.NoError(err)
 		assert.Empty(repoModel.Artifacts)
 		assert.Zero(repoModel.Size)
+		assert.Zero(repoModel.ArtifactsCount)
+
 		// ...artifact meta shall be empty (we removed last artifact)
 		metas = models.ArtifactMetas{}
 		assert.NoError(db.Find(&metas).Error)

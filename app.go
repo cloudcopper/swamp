@@ -141,7 +141,7 @@ func App(log ports.Logger, cmdFS embed.FS) error {
 	// Create http server
 	// The router must has all routes already
 	// It will start server in separate goroutine
-	addr := ":8080"
+	addr := config.Listen
 	httpServer, err := infra.NewWebServer(log, addr, router)
 	if err != nil {
 		log.Error("unable create web server", slog.Any("err", err), slog.String("addr", addr))

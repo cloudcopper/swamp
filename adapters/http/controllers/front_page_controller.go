@@ -29,7 +29,7 @@ func NewFrontPageController(log ports.Logger, render infra.Render, repos domain.
 
 func (c *FrontPageController) Index(w http.ResponseWriter, r *http.Request) {
 	errors := []string{}
-	repos, err := c.repos.Repo().FindAll(ports.WithRelationship(true))
+	repos, err := c.repos.Repo().FindAll(ports.WithRelationship(true), ports.LimitArtifacts(1))
 	if len(repos) == 0 && err == nil {
 		err = lib.Error("ERROR: No repository found!!! Configuration problem ???")
 	}

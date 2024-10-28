@@ -6,29 +6,31 @@ import (
 )
 
 type Repo struct {
-	RepoID      models.RepoID
-	Name        string
-	Description string
-	Input       string
-	Storage     string
-	Broken      string
-	Retention   types.Duration
-	Size        types.Size
-	Meta        models.RepoMetas
-	Artifacts   []*Artifact
+	RepoID         models.RepoID
+	Name           string
+	Description    string
+	Input          string
+	Storage        string
+	Broken         string
+	Retention      types.Duration
+	Size           types.Size
+	ArtifactsCount int
+	Meta           models.RepoMetas
+	Artifacts      []*Artifact
 }
 
 func NewRepo(repo *models.Repo) *Repo {
 	r := &Repo{
-		RepoID:      repo.RepoID,
-		Name:        repo.Name,
-		Description: repo.Description,
-		Input:       repo.Input,
-		Storage:     repo.Storage,
-		Broken:      repo.Broken,
-		Retention:   repo.Retention,
-		Size:        repo.Size,
-		Meta:        repo.Meta,
+		RepoID:         repo.RepoID,
+		Name:           repo.Name,
+		Description:    repo.Description,
+		Input:          repo.Input,
+		Storage:        repo.Storage,
+		Broken:         repo.Broken,
+		Retention:      repo.Retention,
+		Size:           repo.Size,
+		ArtifactsCount: repo.ArtifactsCount,
+		Meta:           repo.Meta,
 	}
 
 	for _, a := range repo.Artifacts {

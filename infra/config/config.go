@@ -42,6 +42,7 @@ func (c *Config) String() string {
 const refRepoID = "${REPO_ID}"
 
 var (
+	Listen                = ":8080"
 	ReposConfigFileName   = "swamp_repos.yml"
 	TopRootFileSystemPath = ""
 	TimerExpiredStart     = 30 * time.Minute

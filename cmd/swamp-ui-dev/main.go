@@ -20,6 +20,7 @@ import (
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
 	"github.com/cloudcopper/swamp/infra"
+	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
 	"github.com/cloudcopper/swamp/lib/random"
 	"github.com/cloudcopper/swamp/lib/types"
@@ -167,7 +168,7 @@ func app(log *slog.Logger) error {
 	// Create http server
 	// The router must has all routes already
 	// It will start server in separate goroutine
-	addr := ":8080"
+	addr := config.Listen
 	httpServer, err := infra.NewWebServer(log, addr, router)
 	if err != nil {
 		log.Error("unable create web server", slog.Any("err", err), slog.String("addr", addr))
