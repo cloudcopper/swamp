@@ -32,7 +32,6 @@
     </p>
     {{if .Repos}}
     {{else}}
-    {{end}}
     <p>
         It seems you have no repo configured yet. To get started with your first repository in Swamp,
         simply create a YAML configuration file named <code>swamp_repos.yml</code> in your project
@@ -54,4 +53,5 @@
         After creating this configuration, save the file, restart Swamp, and it will begin tracking
         artifacts in your newly set up repository. Refresh the web UI to see your first repo in action!
     </p>
+    {{end}}
 {{end}}

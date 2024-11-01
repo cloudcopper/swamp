@@ -2,6 +2,7 @@ TODO
 ====
 - CUSTOM.md - how to customize
 - Correct swamp-intro and readme
+- Release v0.1.0
 
 - broken artifacts shall not be possible to download within single click/direct url
 - broken files shall not be possible to download within single click/direct url

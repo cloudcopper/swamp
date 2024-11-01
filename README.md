@@ -68,6 +68,12 @@ How to customize
 ----------------
 See [CUSTOM](CUSTOM.md)
 
+Current screenshots
+-------------------
+![](./frontpage.png)
+![](./repo.png)
+![](./artifact.png)
+
 Design diagram
 --------------
 ![](./20231122_100028.jpg)
