@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cloudcopper/random"
 	"github.com/cloudcopper/swamp/adapters/http"
 	"github.com/cloudcopper/swamp/adapters/http/controllers"
 	"github.com/cloudcopper/swamp/adapters/repository"
@@ -22,7 +21,6 @@ import (
 	"github.com/cloudcopper/swamp/infra"
 	"github.com/cloudcopper/swamp/infra/config"
 	"github.com/cloudcopper/swamp/lib"
-	"github.com/cloudcopper/swamp/lib/random"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/google/uuid"
@@ -258,7 +256,7 @@ func startup(log ports.Logger, repos domain.Repositories) error {
 			} else {
 				state &= ^vo.ArtifactIsExpired
 			}
-			checksum := genChecksum()
+			checksum := random.Sha256()
 			files := getArtifactFiles(checksum, createdAt)
 			size := 0
 			for _, f := range files {
@@ -302,44 +300,20 @@ func genRepoID(name string, l, n []int) string {
 	return repoID
 }
 
-// The genChecksum returns random sha256 checksum
-func genChecksum() string {
-	b := rw([]int{10, 20})
-	hash := sha256.New()
-	_, _ = hash.Write([]byte(b))
-	sum := hash.Sum(nil)
-	return hex.EncodeToString(sum)
-}
-
 func genArtifactID() string {
 	switch rs([]string{"semver", "hash", "dirty", "short-hash", "uuid", "ulid"}) {
 	case "hash":
-		return genChecksum()
+		return random.Sha256()
 	case "short-hash":
-		return genChecksum()[:8]
+		return random.Sha256()[:8]
 	case "dirty":
-		return fmt.Sprintf("v%s-%d-%s-dirty", genSemver(), rv([]int{1, 10}), genChecksum()[:8])
+		return fmt.Sprintf("v%s-%d-%s-dirty", random.SemVer(), rv([]int{1, 10}), random.Sha256()[:8])
 	case "uuid":
 		return uuid.New().String()
 	case "ulid":
 		return ulid.Make().String()
 	}
-	return genSemver()
-}
-
-func genSemver() string {
-	switch rs([]string{"x.x", "x.x.x", "x.x.x.x", "x.x.x-x.x"}) {
-	case "x.x":
-		return fmt.Sprintf("%v.%v", rv([]int{0, 20}), rv([]int{0, 100}))
-	case "x.x.x":
-		return fmt.Sprintf("%v.%v.%v", rv([]int{0, 20}), rv([]int{0, 50}), rv([]int{0, 200}))
-	case "x.x.x.x":
-		return fmt.Sprintf("%v.%v.%v.%v", rv([]int{0, 50}), rv([]int{0, 100}), rv([]int{0, 200}), rv([]int{0, 100000}))
-	case "x.x.x-x.x":
-		return fmt.Sprintf("%v.%v.%v-%v.%v", rv([]int{0, 20}), rv([]int{0, 50}), rv([]int{0, 300}), rs([]string{"alpha", "beta", "gamma"}), rv([]int{0, 1000}))
-	}
-
-	return ""
+	return random.SemVer()
 }
 
 var countGeneratedFile = int(0)

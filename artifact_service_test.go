@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudcopper/random"
 	"github.com/cloudcopper/swamp/domain/models"
 	"github.com/cloudcopper/swamp/domain/vo"
 	"github.com/cloudcopper/swamp/lib"
-	"github.com/cloudcopper/swamp/lib/random"
 	"github.com/cloudcopper/swamp/lib/types"
 	"github.com/cloudcopper/swamp/ports"
 	"github.com/spf13/afero"

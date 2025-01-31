@@ -1,8 +1,6 @@
 module github.com/cloudcopper/swamp
 
-go 1.22.0
-
-toolchain go1.22.8
+go 1.23.4
 
 require (
 	github.com/cloudcopper/misc v0.1.0
@@ -20,7 +18,7 @@ require (
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.9.0
 	github.com/unrolled/render v1.7.0
-	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.12
@@ -28,6 +26,7 @@ require (
 )
 
 require (
+	github.com/cloudcopper/random v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
