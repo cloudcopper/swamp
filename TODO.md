@@ -18,6 +18,7 @@ TODO
 - handle manual artifact adding to artifact storage
 
 - access log
+- artifacts view/download counters
 - input web (the way to put over http new artifacts)
 - abstract out storage
   - currently it is filesystem but may it be more flexible? minio?
